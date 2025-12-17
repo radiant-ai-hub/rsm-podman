@@ -22,8 +22,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Change to radiant-ai-hub/rsm-podman once repo is moved to that org
-  IMAGE_NAME: vnijs/rsm-podman
+  IMAGE_NAME: radiant-ai-hub/rsm-podman
 
 jobs:
   build-and-push:

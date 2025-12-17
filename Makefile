@@ -10,8 +10,7 @@ DOCKER_BUILDER := multiplatform-builder
 # =============================================================================
 # Podman Configuration (GHCR)
 # =============================================================================
-# Change to ghcr.io/radiant-ai-hub/rsm-podman once org permissions are set up
-PODMAN_IMAGE := ghcr.io/vnijs/rsm-podman
+PODMAN_IMAGE := ghcr.io/radiant-ai-hub/rsm-podman
 CONTAINERFILE := rsm-podman/Containerfile
 
 # =============================================================================
@@ -213,9 +212,12 @@ check-podman: ## Check if Podman is available
 	@echo "$(GREEN)✓ Podman is available$(NC)"
 
 .PHONY: podman-login
-podman-login: check-podman ## Login to GHCR (uses ~/.env GH_TOKEN or prompts)
+podman-login: check-podman ## Login to GHCR (uses gh auth token or prompts)
 	@echo "$(GREEN)Logging in to GHCR...$(NC)"
-	@if [ -f ~/.env ]; then \
+	@if command -v gh >/dev/null 2>&1; then \
+		echo "$(GREEN)Using gh auth token$(NC)"; \
+		unset GH_TOKEN && gh auth token | podman login ghcr.io --username vnijs --password-stdin; \
+	elif [ -f ~/.env ]; then \
 		GH_TOKEN=$$(grep "^GH_TOKEN=" ~/.env | cut -d'"' -f2); \
 		if [ -n "$$GH_TOKEN" ]; then \
 			echo "$(GREEN)Using GH_TOKEN from ~/.env$(NC)"; \
@@ -225,7 +227,7 @@ podman-login: check-podman ## Login to GHCR (uses ~/.env GH_TOKEN or prompts)
 			podman login ghcr.io; \
 		fi; \
 	else \
-		echo "$(YELLOW)No ~/.env found, running interactive login$(NC)"; \
+		echo "$(YELLOW)Running interactive login$(NC)"; \
 		podman login ghcr.io; \
 	fi
 
