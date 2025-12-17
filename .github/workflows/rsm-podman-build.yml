@@ -207,16 +207,14 @@ jobs:
 
       - name: Test PySpark job execution
         run: |
-          docker exec rsm-test bash -l -c '
-            python -c "
+          docker exec rsm-test bash -l -c 'python << EOF
 from pyspark.sql import SparkSession
-spark = SparkSession.builder.appName(\"test\").master(\"local[*]\").getOrCreate()
-df = spark.createDataFrame([(1, \"a\"), (2, \"b\")], [\"id\", \"value\"])
+spark = SparkSession.builder.appName("test").master("local[*]").getOrCreate()
+df = spark.createDataFrame([(1, "a"), (2, "b")], ["id", "value"])
 assert df.count() == 2
-print(\"PySpark job executed successfully\")
+print("PySpark job executed successfully")
 spark.stop()
-            "
-          '
+EOF'
 
       - name: Cleanup
         if: always()
