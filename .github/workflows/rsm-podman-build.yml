@@ -94,7 +94,12 @@ jobs:
       - name: Push amd64 image
         if: github.event_name != 'pull_request'
         run: |
-          podman push --remove-signatures ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
+          # Retry up to 3 times for transient network issues
+          for i in 1 2 3; do
+            podman push --remove-signatures ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64 && break
+            echo "Push attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
 
   build-arm64:
     runs-on: ubuntu-latest
@@ -169,7 +174,12 @@ jobs:
       - name: Push arm64 image
         if: github.event_name != 'pull_request'
         run: |
-          podman push --remove-signatures ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
+          # Retry up to 3 times for transient network issues
+          for i in 1 2 3; do
+            podman push --remove-signatures ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64 && break
+            echo "Push attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
 
   create-manifest:
     needs: [build-amd64, build-arm64]
