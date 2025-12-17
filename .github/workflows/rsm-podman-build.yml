@@ -76,7 +76,7 @@ jobs:
       - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GHCR_TOKEN }}" | podman login ${{ env.REGISTRY }} -u vnijs --password-stdin
 
       - name: Build amd64 image with Podman
         env:
@@ -85,6 +85,7 @@ jobs:
           podman build \
             --platform linux/amd64 \
             --layers=false \
+            --format docker \
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64 \
             --build-arg IMAGE_VERSION=${{ github.sha }} \
             -f rsm-podman/Containerfile \
@@ -93,7 +94,7 @@ jobs:
       - name: Push amd64 image
         if: github.event_name != 'pull_request'
         run: |
-          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
+          podman push --format v2s2 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
 
   build-arm64:
     runs-on: ubuntu-latest
@@ -150,7 +151,7 @@ jobs:
       - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GHCR_TOKEN }}" | podman login ${{ env.REGISTRY }} -u vnijs --password-stdin
 
       - name: Build arm64 image with Podman
         env:
@@ -159,6 +160,7 @@ jobs:
           podman build \
             --platform linux/arm64 \
             --layers=false \
+            --format docker \
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64 \
             --build-arg IMAGE_VERSION=${{ github.sha }} \
             -f rsm-podman/Containerfile \
@@ -167,7 +169,7 @@ jobs:
       - name: Push arm64 image
         if: github.event_name != 'pull_request'
         run: |
-          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
+          podman push --format v2s2 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
 
   create-manifest:
     needs: [build-amd64, build-arm64]
@@ -185,7 +187,7 @@ jobs:
 
       - name: Log in to GHCR with Podman
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GHCR_TOKEN }}" | podman login ${{ env.REGISTRY }} -u vnijs --password-stdin
 
       - name: Create and push multi-arch manifest
         run: |
@@ -231,7 +233,7 @@ jobs:
 
       - name: Log in to GHCR with Podman
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GHCR_TOKEN }}" | podman login ${{ env.REGISTRY }} -u vnijs --password-stdin
 
       - name: Pull image for platform
         run: |
