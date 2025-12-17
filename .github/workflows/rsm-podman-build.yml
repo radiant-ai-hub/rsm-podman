@@ -73,9 +73,9 @@ jobs:
         run: |
           podman build \
             --platform linux/amd64 \
+            --layers=false \
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64 \
             --build-arg IMAGE_VERSION=${{ github.sha }} \
-            --format docker \
             -f rsm-podman/Containerfile \
             .
 
@@ -136,9 +136,9 @@ jobs:
         run: |
           podman build \
             --platform linux/arm64 \
+            --layers=false \
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64 \
             --build-arg IMAGE_VERSION=${{ github.sha }} \
-            --format docker \
             -f rsm-podman/Containerfile \
             .
 
