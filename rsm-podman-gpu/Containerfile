@@ -1,4 +1,5 @@
-FROM vnijs/rsm-msba-k8s:2.0.0
+FROM ghcr.io/radiant-ai-hub/rsm-podman:latest
+
 USER root
 
 # Install CUDA repository and keys
@@ -20,14 +21,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PATH=/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}
 
-# add github setup script
-COPY files/zsh/github.sh /usr/local/bin/github
+# Checks every 30s, times out at 10s, fails after 3 consecutive failures
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD pg_isready -h localhost -p 8765 -U jovyan || exit 1
 
-EXPOSE 22 8765
+# Expose non-privileged ports for rootless operation
+# 2222 - SSH
+# 8282 - pgweb
+# 8765 - PostgreSQL
+EXPOSE 2222
 
 CMD ["/usr/local/bin/start-container.sh"]
 
-# Switch back to jovyan to avoid accidental container runs as root
+# Run as non-root user for rootless container operation
 USER ${NB_UID}
 ENV HOME=/home/${NB_USER}
-WORKDIR "${HOME}"
