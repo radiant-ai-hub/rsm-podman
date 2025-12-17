@@ -222,7 +222,8 @@ else
     sed_fun () {
       sed -i '' -e $1 "$2"
     }
-    MNT="-v /Volumes:/media/Volumes"
+    MNT=""
+    # MNT="-v /Volumes:/media/Volumes"
   else
     archtype=`arch`
     ostype="Windows"

@@ -215,3 +215,10 @@ docker run --platform linux/amd64 radiant-rstats/rsm-msba-k8s:latest
 3. Validate both platform images work correctly
 4. Consider migrating your CI/CD to use this unified approach
 5. Eventually retire the separate ARM/Intel Dockerfiles (when ready)
+
+=
+podman machine stop
+podman machine rm -f
+podman machine set --rootful
+podman machine init --volume $HOME:$HOME
+podman machine start
