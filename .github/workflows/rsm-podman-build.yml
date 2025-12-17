@@ -36,23 +36,32 @@ jobs:
         run: |
           echo "Before cleanup:"
           df -h
-          # Remove unnecessary large packages
+          # Comprehensive cleanup to free ~48GB
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /opt/hostedtoolcache/go
-          sudo rm -rf /opt/hostedtoolcache/node
+          sudo rm -rf /opt/hostedtoolcache
           sudo rm -rf /usr/local/share/powershell
           sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/julia*
+          sudo rm -rf /usr/share/miniconda
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/graalvm/
+          sudo rm -rf /usr/local/.ghcup/
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/lib/node_modules
           # Remove Docker completely since we use Podman
           sudo systemctl stop docker || true
-          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io || true
+          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io moby-engine moby-cli || true
           sudo rm -rf /var/lib/docker
           sudo rm -rf /var/lib/containerd
-          # Clean apt cache
+          # Clean package caches
+          sudo apt-get autoremove -y
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
+          # Create larger tmp directory for Podman
+          sudo mkdir -p /mnt/podman-tmp
+          sudo chmod 1777 /mnt/podman-tmp
           echo "After cleanup:"
           df -h
 
@@ -70,6 +79,8 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Build amd64 image with Podman
+        env:
+          TMPDIR: /mnt/podman-tmp
         run: |
           podman build \
             --platform linux/amd64 \
@@ -95,23 +106,32 @@ jobs:
         run: |
           echo "Before cleanup:"
           df -h
-          # Remove unnecessary large packages
+          # Comprehensive cleanup to free ~48GB
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /opt/hostedtoolcache/go
-          sudo rm -rf /opt/hostedtoolcache/node
+          sudo rm -rf /opt/hostedtoolcache
           sudo rm -rf /usr/local/share/powershell
           sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/julia*
+          sudo rm -rf /usr/share/miniconda
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/graalvm/
+          sudo rm -rf /usr/local/.ghcup/
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/lib/node_modules
           # Remove Docker completely since we use Podman
           sudo systemctl stop docker || true
-          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io || true
+          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io moby-engine moby-cli || true
           sudo rm -rf /var/lib/docker
           sudo rm -rf /var/lib/containerd
-          # Clean apt cache
+          # Clean package caches
+          sudo apt-get autoremove -y
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
+          # Create larger tmp directory for Podman
+          sudo mkdir -p /mnt/podman-tmp
+          sudo chmod 1777 /mnt/podman-tmp
           echo "After cleanup:"
           df -h
 
@@ -133,6 +153,8 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Build arm64 image with Podman
+        env:
+          TMPDIR: /mnt/podman-tmp
         run: |
           podman build \
             --platform linux/arm64 \
