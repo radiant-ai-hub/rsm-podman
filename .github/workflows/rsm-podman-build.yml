@@ -47,29 +47,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
 
-      - name: Log in to GHCR
+      - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
-      - name: Build and push amd64 image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: rsm-podman/Containerfile
-          platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
-          build-args: |
-            IMAGE_VERSION=${{ github.sha }}
-          cache-from: type=gha,scope=amd64
-          cache-to: type=gha,mode=max,scope=amd64
+      - name: Build amd64 image with Podman
+        run: |
+          podman build \
+            --platform linux/amd64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64 \
+            --build-arg IMAGE_VERSION=${{ github.sha }} \
+            --format docker \
+            -f rsm-podman/Containerfile \
+            .
+
+      - name: Push amd64 image
+        if: github.event_name != 'pull_request'
+        run: |
+          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
 
   build-arm64:
     runs-on: ubuntu-latest
@@ -94,31 +95,33 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up QEMU for arm64 emulation
-        uses: docker/setup-qemu-action@v3
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Podman
+        run: |
+          sudo apt-get install -y podman
 
-      - name: Log in to GHCR
+      - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
-      - name: Build and push arm64 image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: rsm-podman/Containerfile
-          platforms: linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
-          build-args: |
-            IMAGE_VERSION=${{ github.sha }}
-          cache-from: type=gha,scope=arm64
-          cache-to: type=gha,mode=max,scope=arm64
+      - name: Build arm64 image with Podman
+        run: |
+          podman build \
+            --platform linux/arm64 \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64 \
+            --build-arg IMAGE_VERSION=${{ github.sha }} \
+            --format docker \
+            -f rsm-podman/Containerfile \
+            .
+
+      - name: Push arm64 image
+        if: github.event_name != 'pull_request'
+        run: |
+          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
 
   create-manifest:
     needs: [build-amd64, build-arm64]
@@ -129,26 +132,34 @@ jobs:
       packages: write
 
     steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      - name: Log in to GHCR with Podman
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Create and push multi-arch manifest
         run: |
           # Create manifest for the SHA tag
-          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
-          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          podman manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          podman manifest add ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
+          podman manifest add ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
+          podman manifest push --all ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
           # Create manifest for latest tag
-          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
-          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          podman manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          podman manifest add ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
+          podman manifest add ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
+          podman manifest push --all ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
   integration-tests:
     needs: create-manifest
@@ -164,22 +175,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Podman
+        run: |
+          sudo apt-get install -y podman
+
+      - name: Log in to GHCR with Podman
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Pull image for platform
         run: |
-          docker pull --platform ${{ matrix.platform }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          podman pull --platform ${{ matrix.platform }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Start container
         run: |
-          docker run -d --name rsm-test \
+          podman run -d --name rsm-test \
             --platform ${{ matrix.platform }} \
             -p 8765:8765 \
             -p 2222:2222 \
@@ -192,15 +206,15 @@ jobs:
           sleep 30
 
           # Check container is running
-          if ! docker ps | grep -q rsm-test; then
+          if ! podman ps | grep -q rsm-test; then
             echo "Container failed to start"
-            docker logs rsm-test
+            podman logs rsm-test
             exit 1
           fi
 
           # Wait for PostgreSQL to be ready
           for i in {1..30}; do
-            if docker exec rsm-test pg_isready -h localhost -p 8765 -U jovyan 2>/dev/null; then
+            if podman exec rsm-test pg_isready -h localhost -p 8765 -U jovyan 2>/dev/null; then
               echo "PostgreSQL is ready"
               break
             fi
@@ -210,11 +224,11 @@ jobs:
 
       - name: Test PostgreSQL connection
         run: |
-          docker exec rsm-test psql -h localhost -p 8765 -U jovyan -c 'SELECT 1 as test;'
+          podman exec rsm-test psql -h localhost -p 8765 -U jovyan -c 'SELECT 1 as test;'
 
       - name: Test PostgreSQL create table
         run: |
-          docker exec rsm-test psql -h localhost -p 8765 -U jovyan -c '
+          podman exec rsm-test psql -h localhost -p 8765 -U jovyan -c '
             CREATE TABLE test_table (id SERIAL PRIMARY KEY, name TEXT);
             INSERT INTO test_table (name) VALUES ('"'"'test_value'"'"');
             SELECT * FROM test_table;
@@ -223,11 +237,11 @@ jobs:
 
       - name: Test Java installation
         run: |
-          docker exec rsm-test bash -l -c 'java -version'
+          podman exec rsm-test bash -l -c 'java -version'
 
       - name: Test environment variables
         run: |
-          docker exec rsm-test bash -l -c '
+          podman exec rsm-test bash -l -c '
             echo "JAVA_HOME=$JAVA_HOME"
             echo "SPARK_HOME=$SPARK_HOME"
             echo "HADOOP_HOME=$HADOOP_HOME"
@@ -238,35 +252,33 @@ jobs:
 
       - name: Test pgweb binary
         run: |
-          docker exec rsm-test /usr/local/bin/pgweb_binary --version
+          podman exec rsm-test /usr/local/bin/pgweb_binary --version
 
       - name: Test SSH configuration
         run: |
-          docker exec rsm-test sshd -T | grep -E "port|permitrootlogin"
+          podman exec rsm-test sshd -T | grep -E "port|permitrootlogin"
 
       - name: Test Python and PySpark imports
         run: |
-          docker exec rsm-test bash -l -c '
+          podman exec rsm-test bash -l -c '
             python -c "import pyspark; print(f\"PySpark version: {pyspark.__version__}\")"
           '
 
       - name: Test SSH accepts connections
         run: |
-          # Install SSH client
-          sudo apt-get update && sudo apt-get install -y openssh-client
           # Generate a test key
           ssh-keygen -t ed25519 -f /tmp/test_key -N ""
           # Add public key to container
-          docker exec rsm-test bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
-          docker cp /tmp/test_key.pub rsm-test:/home/jovyan/.ssh/authorized_keys
-          docker exec rsm-test bash -c "chmod 600 ~/.ssh/authorized_keys"
+          podman exec rsm-test bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
+          podman cp /tmp/test_key.pub rsm-test:/home/jovyan/.ssh/authorized_keys
+          podman exec rsm-test bash -c "chmod 600 ~/.ssh/authorized_keys"
           # Test SSH connection
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"
 
       - name: Test Hadoop HDFS initialization
         run: |
-          docker exec rsm-test bash -l -c '
+          podman exec rsm-test bash -l -c '
             # Initialize HDFS (namenode format)
             cd $HADOOP_HOME
             ./init-dfs.sh
@@ -275,7 +287,7 @@ jobs:
 
       - name: Test Hadoop commands
         run: |
-          docker exec rsm-test bash -l -c '
+          podman exec rsm-test bash -l -c '
             # Verify hadoop command works
             hadoop version
             echo "Hadoop commands working"
@@ -283,10 +295,10 @@ jobs:
 
       - name: Test PySpark job execution
         run: |
-          docker exec rsm-test bash -l -c "python -c 'from pyspark.sql import SparkSession; spark = SparkSession.builder.master(\"local\").getOrCreate(); print(\"PySpark works\"); spark.stop()'"
+          podman exec rsm-test bash -l -c "python -c 'from pyspark.sql import SparkSession; spark = SparkSession.builder.master(\"local\").getOrCreate(); print(\"PySpark works\"); spark.stop()'"
 
       - name: Cleanup
         if: always()
         run: |
-          docker stop rsm-test || true
-          docker rm rsm-test || true
+          podman stop rsm-test || true
+          podman rm rsm-test || true
