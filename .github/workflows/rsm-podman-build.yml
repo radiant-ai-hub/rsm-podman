@@ -2,14 +2,14 @@ name: Build rsm-podman
 
 on:
   push:
-    branches: [podman]
+    branches: [main]
     paths:
       - 'rsm-podman/**'
       - 'files/**'
       - 'scripts-podman-mp/**'
       - '.github/workflows/rsm-podman-build.yml'
   pull_request:
-    branches: [podman]
+    branches: [main]
     paths:
       - 'rsm-podman/**'
       - 'files/**'
