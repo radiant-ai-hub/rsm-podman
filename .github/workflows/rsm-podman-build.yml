@@ -1,0 +1,226 @@
+name: Build rsm-podman
+
+on:
+  push:
+    branches: [podman]
+    paths:
+      - 'rsm-podman/**'
+      - 'files/**'
+      - 'scripts-podman-mp/**'
+      - '.github/workflows/rsm-podman-build.yml'
+  pull_request:
+    branches: [podman]
+    paths:
+      - 'rsm-podman/**'
+      - 'files/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Image version tag'
+        required: false
+        default: 'latest'
+
+env:
+  REGISTRY: ghcr.io
+  # Change to radiant-ai-hub/rsm-podman once repo is moved to that org
+  IMAGE_NAME: vnijs/rsm-podman
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for multi-arch builds
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+            type=ref,event=pr
+            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event.inputs.version != '' && github.event.inputs.version != 'latest' }}
+
+      - name: Build and push multi-platform image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: rsm-podman/Containerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            IMAGE_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration-tests:
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image for platform
+        run: |
+          docker pull --platform ${{ matrix.platform }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Start container
+        run: |
+          docker run -d --name rsm-test \
+            --platform ${{ matrix.platform }} \
+            -p 8765:8765 \
+            -p 2222:2222 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            /usr/local/bin/start-container.sh
+
+      - name: Wait for container to be healthy
+        run: |
+          echo "Waiting for container to start..."
+          sleep 30
+
+          # Check container is running
+          if ! docker ps | grep -q rsm-test; then
+            echo "Container failed to start"
+            docker logs rsm-test
+            exit 1
+          fi
+
+          # Wait for PostgreSQL to be ready
+          for i in {1..30}; do
+            if docker exec rsm-test pg_isready -h localhost -p 8765 -U jovyan 2>/dev/null; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: Test PostgreSQL connection
+        run: |
+          docker exec rsm-test psql -h localhost -p 8765 -U jovyan -c 'SELECT 1 as test;'
+
+      - name: Test PostgreSQL create table
+        run: |
+          docker exec rsm-test psql -h localhost -p 8765 -U jovyan -c '
+            CREATE TABLE test_table (id SERIAL PRIMARY KEY, name TEXT);
+            INSERT INTO test_table (name) VALUES ('"'"'test_value'"'"');
+            SELECT * FROM test_table;
+            DROP TABLE test_table;
+          '
+
+      - name: Test Java installation
+        run: |
+          docker exec rsm-test bash -l -c 'java -version'
+
+      - name: Test environment variables
+        run: |
+          docker exec rsm-test bash -l -c '
+            echo "JAVA_HOME=$JAVA_HOME"
+            echo "SPARK_HOME=$SPARK_HOME"
+            echo "HADOOP_HOME=$HADOOP_HOME"
+            test -n "$JAVA_HOME" || exit 1
+            test -n "$SPARK_HOME" || exit 1
+            test -n "$HADOOP_HOME" || exit 1
+          '
+
+      - name: Test pgweb binary
+        run: |
+          docker exec rsm-test /usr/local/bin/pgweb_binary --version
+
+      - name: Test SSH configuration
+        run: |
+          docker exec rsm-test sshd -T | grep -E "port|permitrootlogin"
+
+      - name: Test Python and PySpark imports
+        run: |
+          docker exec rsm-test bash -l -c '
+            python -c "import pyspark; print(f\"PySpark version: {pyspark.__version__}\")"
+          '
+
+      - name: Test SSH accepts connections
+        run: |
+          # Install SSH client
+          sudo apt-get update && sudo apt-get install -y openssh-client
+          # Generate a test key
+          ssh-keygen -t ed25519 -f /tmp/test_key -N ""
+          # Add public key to container
+          docker exec rsm-test bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
+          docker cp /tmp/test_key.pub rsm-test:/home/jovyan/.ssh/authorized_keys
+          docker exec rsm-test bash -c "chmod 600 ~/.ssh/authorized_keys"
+          # Test SSH connection
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"
+
+      - name: Test Hadoop HDFS initialization
+        run: |
+          docker exec rsm-test bash -l -c '
+            # Initialize HDFS (namenode format)
+            cd $HADOOP_HOME
+            ./init-dfs.sh
+            echo "HDFS initialized successfully"
+          '
+
+      - name: Test Hadoop commands
+        run: |
+          docker exec rsm-test bash -l -c '
+            # Verify hadoop command works
+            hadoop version
+            echo "Hadoop commands working"
+          '
+
+      - name: Test PySpark job execution
+        run: |
+          docker exec rsm-test bash -l -c '
+            python -c "
+from pyspark.sql import SparkSession
+spark = SparkSession.builder.appName(\"test\").master(\"local[*]\").getOrCreate()
+df = spark.createDataFrame([(1, \"a\"), (2, \"b\")], [\"id\", \"value\"])
+assert df.count() == 2
+print(\"PySpark job executed successfully\")
+spark.stop()
+            "
+          '
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop rsm-test || true
+          docker rm rsm-test || true
