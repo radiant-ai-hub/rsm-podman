@@ -94,7 +94,7 @@ jobs:
       - name: Push amd64 image
         if: github.event_name != 'pull_request'
         run: |
-          podman push --format v2s2 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
+          podman push --remove-signatures ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-amd64
 
   build-arm64:
     runs-on: ubuntu-latest
@@ -169,7 +169,7 @@ jobs:
       - name: Push arm64 image
         if: github.event_name != 'pull_request'
         run: |
-          podman push --format v2s2 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
+          podman push --remove-signatures ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-arm64
 
   create-manifest:
     needs: [build-amd64, build-arm64]
