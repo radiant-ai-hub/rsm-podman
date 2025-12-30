@@ -86,7 +86,7 @@ RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 COPY files/install-quarto.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
-# Install uv package manager
+# Install uv package manager and python packages
 COPY files/install-uv.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 

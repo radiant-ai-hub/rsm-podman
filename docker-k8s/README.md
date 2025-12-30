@@ -1,217 +1,160 @@
-# Multi-Platform Docker Build Setup
+# RSM Docker Container Build
 
-This folder contains a unified approach to building Docker images that work on both ARM64 (Apple Silicon) and AMD64 (Intel) architectures using a single Dockerfile.
+This directory contains the Dockerfile and build configuration for the `rsm-msba-k8s` Docker image, which is built automatically via GitHub Actions and pushed to Docker Hub and GitHub Container Registry.
 
-## Overview
+## Image Locations
 
-Instead of maintaining separate Dockerfiles for ARM and Intel, this approach uses Docker's multi-platform build capabilities to create a single image that works on both architectures.
+| Registry | Image |
+|----------|-------|
+| Docker Hub | `vnijs/rsm-msba-k8s` |
+| GHCR | `ghcr.io/radiant-ai-hub/rsm-msba-k8s` |
 
-## Key Features
+```bash
+# Pull from Docker Hub
+docker pull vnijs/rsm-msba-k8s:latest
 
-- **Single Dockerfile**: One source of truth for both architectures
-- **Platform Detection**: Automatically detects target platform and sets appropriate configurations
-- **Local Building**: Optimized for building on Mac Studio with Docker Desktop
-- **Multi-Platform Push**: Pushes to Docker Hub with multi-platform manifest
+# Pull from GHCR
+docker pull ghcr.io/radiant-ai-hub/rsm-msba-k8s:latest
 
-## Architecture Differences Handled
+# Pull a specific version
+docker pull vnijs/rsm-msba-k8s:2.4.0
+```
 
-The unified Dockerfile automatically handles these platform-specific differences:
+## CI/CD Pipeline
 
-1. **Base Images**: Uses platform-appropriate base image SHAs
-2. **Java Paths**:
-   - ARM64: `/usr/lib/jvm/java-17-openjdk-arm64/`
-   - AMD64: `/usr/lib/jvm/java-17-openjdk-amd64/`
-3. **Binary Downloads**: Downloads correct pgweb binary for each platform
-4. **Image Names**: Sets appropriate `IMAGE_NAME` environment variable
+Images are built automatically using GitHub Actions (`.github/workflows/rsm-docker-build.yml`).
+
+### Build Triggers
+
+| Trigger | Version Format | Tags Created |
+|---------|----------------|--------------|
+| Push to `main` | `2.4.0-dev.abc1234` | Version only |
+| Git tag `v2.4.0` | `2.4.0` | Version + `latest` |
+| Manual (workflow_dispatch) | User-specified | Configurable |
+
+### Build Process
+
+1. **Parallel platform builds**: amd64 and arm64 images are built separately
+2. **Dual registry push**: Images are pushed to both Docker Hub and GHCR
+3. **Manifest creation**: Multi-architecture manifests for both registries
+4. **Integration tests**: Automated tests verify PostgreSQL, SSH, Java, PySpark, and Hadoop
+
+### Triggering a Release Build
+
+To create a new versioned release:
+
+```bash
+# 1. Update the VERSION file (in repository root)
+echo "2.5.0" > VERSION
+git add VERSION
+git commit -m "Bump version to 2.5.0"
+git push origin main
+
+# 2. Create and push the release tag
+git tag v2.5.0
+git push origin v2.5.0
+```
+
+This triggers a build that creates:
+- `vnijs/rsm-msba-k8s:2.5.0` (Docker Hub)
+- `vnijs/rsm-msba-k8s:latest` (Docker Hub)
+- `ghcr.io/radiant-ai-hub/rsm-msba-k8s:2.5.0` (GHCR)
+- `ghcr.io/radiant-ai-hub/rsm-msba-k8s:latest` (GHCR)
+
+### Manual Workflow Trigger
+
+You can trigger a manual build from the GitHub Actions UI:
+
+1. Go to **Actions** > **Build rsm-msba-k8s (Docker)**
+2. Click **Run workflow**
+3. Optionally specify a custom version
+4. Choose whether to tag as `latest`
+
+## Dockerfile Overview
+
+**Base Image**: `quay.io/jupyter/pyspark-notebook:2025-12-15`
+
+### Key Components
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| PostgreSQL | 16 | Port 8765 |
+| Quarto | 1.9.13 | Scientific publishing |
+| Hadoop | 3.3.4 | HDFS support |
+| Java | 17 | OpenJDK |
+| pgweb | 0.11.11 | Database UI on port 8282 |
+| SSH | OpenSSH | Port 2222 |
+
+### Platform Support
+
+The Dockerfile supports both architectures:
+- **ARM64** (Apple Silicon, AWS Graviton)
+- **AMD64** (Intel/AMD x86_64)
+
+Platform-specific handling:
+- Java paths: `/usr/lib/jvm/java-17-openjdk-arm64/` vs `/usr/lib/jvm/java-17-openjdk-amd64/`
+- pgweb binary: `pgweb_linux_arm64_v7.zip` vs `pgweb_linux_amd64.zip`
 
 ## Files
 
 ```
-scripts-mp/
-│   ├── build-multiplatform.sh   # Main build script
-│   ├── test-build.sh            # Local test build (no push)
-│   ├── test-auth.sh             # Authentication test
-│   ├── validate-setup.sh        # Pre-build validation
-rsm-msba-k8s/
-├── Dockerfile                    # Unified multi-platform Dockerfile
-└── README.md                    # This file
+docker-k8s/
+├── Dockerfile    # Multi-platform Docker image definition
+└── README.md     # This file
 ```
 
-## Prerequisites
+## Local Building (Optional)
 
-1. **Docker Desktop** with buildx support (latest version recommended)
-2. **Docker Hub Account** for pushing images
-3. **Sufficient Resources**:
-   - 16GB+ RAM recommended
-   - 20GB+ free disk space
-   - Good cooling (long build process)
-
-## Quick Start
-
-### 1. Validate Setup
-
-Before building, run the validation script to check your environment:
+While CI/CD handles production builds, you can build locally for testing:
 
 ```bash
-cd scripts-mp
-./validate-setup.sh
-```
+# From repository root
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg IMAGE_VERSION=test \
+  -f docker-k8s/Dockerfile \
+  -t rsm-msba-k8s:test \
+  .
 
-This will check:
-
-- Docker Desktop is running
-- buildx is available
-- Required files are present
-- Docker Hub authentication
-- Available disk space
-
-### 2. Test Authentication
-
-Test your Docker Hub authentication (recommended):
-
-```bash
-./scripts/test-auth.sh
-```
-
-This verifies your authentication works before starting the long build process.
-
-### 3. Set Up Authentication
-
-Choose one of these methods (no interactive login required):
-
-**Option A: Docker Access Token (Recommended)**
-
-```bash
-export DOCKER_TOKEN=your_docker_hub_token
-```
-
-**Option B: Username/Password**
-
-```bash
-export DOCKER_USERNAME=your_username
-export DOCKER_PASSWORD=your_password
-```
-
-**Option C: One-time manual login**
-
-```bash
-docker login
-```
-
-### 4. Build and Push
-
-```bash
-cd scripts-mp
-./build-multiplatform.sh [version]
-```
-
-Examples:
-
-```bash
-# Build with 'latest' tag
-./build-multiplatform.sh
-
-# Build with specific version
-./build-multiplatform.sh v2.0.0
-
-# Build with date-based version
-./build-multiplatform.sh 2025-01-19
-```
-
-## Build Process
-
-The build script will:
-
-1. Create a multi-platform builder if needed
-2. Bootstrap the builder environment
-3. Build for both `linux/amd64` and `linux/arm64` platforms simultaneously
-4. Push both images and create a multi-platform manifest
-5. Display build timing and manifest information
-
-## Expected Build Time
-
-- **Mac Studio M1/M2**: 30-45 minutes
-- **Intel Mac**: 45-60 minutes
-- **Depends on**: Network speed, Docker layer caching, system load
-
-## Usage After Build
-
-Once built and pushed, users can pull and run the image on any supported platform:
-
-```bash
-# Docker automatically selects the right platform
-docker pull radiant-rstats/rsm-msba-k8s:latest
-docker run -it radiant-rstats/rsm-msba-k8s:latest
-
-# Explicitly specify platform if needed
-docker pull --platform linux/amd64 radiant-rstats/rsm-msba-k8s:latest
-docker pull --platform linux/arm64 radiant-rstats/rsm-msba-k8s:latest
+# For multi-platform local build (requires buildx)
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --build-arg IMAGE_VERSION=test \
+  -f docker-k8s/Dockerfile \
+  -t rsm-msba-k8s:test \
+  .
 ```
 
 ## Troubleshooting
 
-### Build Fails with "platform not supported"
+### Build Fails in CI
 
-Enable experimental features in Docker Desktop settings.
+1. Check GitHub Actions logs for specific errors
+2. Verify disk space cleanup is working (builds require ~20GB)
+3. Check Docker Hub authentication (`DOCKER_USERNAME`, `DOCKER_TOKEN` secrets)
+4. Check GHCR authentication (`GHCR_TOKEN` secret)
 
-### Out of Disk Space
-
-The build creates large intermediate layers. Clean up Docker:
-
-```bash
-docker system prune -a
-docker buildx prune -a
-```
-
-### Build Takes Too Long
-
-- Ensure Docker Desktop has sufficient resources allocated
-- Close other resource-intensive applications
-- Consider building during off-peak hours for better network performance
-
-### Authentication Issues
-
-Make sure you're logged into Docker Hub:
+### Image Won't Pull
 
 ```bash
-docker logout
+# Check available tags on Docker Hub
+docker search vnijs/rsm-msba-k8s
+
+# Authenticate if needed
 docker login
 ```
 
-## Migration from Existing Setup
-
-This setup is designed to complement, not replace, your existing ARM and Intel Dockerfiles. The original files in `rsm-msba-k8s-arm/` and `rsm-msba-k8s-intel/` remain untouched.
-
-### Benefits of Migration
-
-1. **Maintenance**: Single file to maintain instead of two
-2. **Consistency**: Eliminates drift between ARM/Intel versions
-3. **Efficiency**: Single build process, better caching
-4. **User Experience**: Users get correct image automatically
-
-### Testing the New Approach
-
-You can test the new multi-platform image alongside your existing ones:
+### Platform Mismatch
 
 ```bash
-# Test ARM image (on Apple Silicon)
-docker run --platform linux/arm64 radiant-rstats/rsm-msba-k8s:latest
-
-# Test Intel image (on Intel Mac or with emulation)
-docker run --platform linux/amd64 radiant-rstats/rsm-msba-k8s:latest
+# Explicitly specify platform
+docker pull --platform linux/arm64 vnijs/rsm-msba-k8s:latest
+docker pull --platform linux/amd64 vnijs/rsm-msba-k8s:latest
 ```
 
-## Performance Notes
+## Related Files
 
-- **Apple Silicon**: Native ARM64 performance
-- **Intel Macs**: Native AMD64 performance
-- **Cross-platform**: Docker handles emulation when needed
-- **Cloud Deployment**: Works on both ARM and Intel cloud instances
-
-## Next Steps
-
-1. Test the build process with the validation script
-2. Run a test build with a version tag
-3. Validate both platform images work correctly
-4. Consider migrating your CI/CD to use this unified approach
-5. Eventually retire the separate ARM/Intel Dockerfiles (when ready)
+- **Workflow**: `.github/workflows/rsm-docker-build.yml`
+- **Version**: `VERSION` (repository root)
+- **Launch script**: `launch-docker-k8s.sh`
+- **Podman equivalent**: `rsm-podman/Containerfile`
