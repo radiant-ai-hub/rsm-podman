@@ -63,6 +63,7 @@ uv add \
 uv add \
   IPython \
   nbclient \
+  nbconvert \
   jupytext \
   isort \
   xlrd \

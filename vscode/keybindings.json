@@ -39,5 +39,9 @@
     {
       "key": "ctrl+shift+a",
       "command": "-cursorLineStartSelect"
+    },
+    {
+      "key": "ctrl+shift+w",
+      "command": "-workbench.action.closeWindow"
     }
 ]

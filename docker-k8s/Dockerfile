@@ -8,8 +8,8 @@ FROM quay.io/jupyter/pyspark-notebook:2025-12-15
 
 USER root
 
-# Define build argument and set it as an environment variable in one step
-ARG IMAGE_VERSION
+# Define build argument and set it as an environment variable
+ARG IMAGE_VERSION=latest
 ENV IMAGE_VERSION=${IMAGE_VERSION}
 
 # Get platform info for conditional logic
@@ -17,18 +17,11 @@ ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
 
-# Set platform-specific environment variables
-# Note: IMAGE_NAME and platform-specific vars will be set dynamically below
-
-# Ensure NB_USER is set (some base images might not have it)
+# Ensure NB_USER is set
 ENV NB_USER=${NB_USER:-jovyan}
 
-# Python env variables
-# ENV PYARROW_VERSION="20.0.0"
-
-# R and Posit related env variables
+# Quarto version
 ENV QUARTO_VERSION="1.9.13"
-# ENV TERM=xterm
 ENV PATH="/usr/local/bin:$PATH"
 
 # Postgres env variables
@@ -42,7 +35,7 @@ ENV RSMBASE=${RSMBASE} \
     ZDOTDIR=/home/${NB_USER}/.rsm-msba/zsh
 
 # Set platform-specific variables for build time (PGWEB_FILE needed for binary download)
-# Note: JAVA_HOME is set at runtime by /etc/profile.d/rsm-env.sh
+# Note: JAVA_HOME, SPARK_HOME, HADOOP_HOME, PYTHONPATH are set at runtime by /etc/profile.d/rsm-env.sh
 RUN if [ "${TARGETARCH}" = "arm64" ]; then \
     echo "export PGWEB_FILE=pgweb_linux_arm64_v7.zip" >> /etc/environment; \
     elif [ "${TARGETARCH}" = "amd64" ]; then \
@@ -54,48 +47,40 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 # Source the environment file to make PGWEB_FILE available for build
 RUN . /etc/environment
 
-# Add autojump to initial package installation
+# Install base packages
 COPY files/init-apt.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
+# PostgreSQL configuration
 COPY files/postgres/postgresql.conf /etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf
 COPY files/postgres/pg_hba.conf /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf
 
+# Install PostgreSQL
 COPY files/postgres/install-postgres-mp.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
 # Copy postgres init script for runtime initialization (fresh volume mounts)
 COPY files/postgres/init-postgres-db.sh /usr/local/bin/init-postgres-db.sh
 RUN chmod +x /usr/local/bin/init-postgres-db.sh
 
+# Install SSH server (configured for port 2222 - non-privileged)
 COPY files/install-sshd.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
+# Install Quarto
 COPY files/install-quarto.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
+# Install uv package manager and python packages
 COPY files/install-uv.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
-# Setup hadoop
-# JAVA_HOME is set via platform detection above
+# Setup Hadoop
 ENV HADOOP_VERSION=3.3.4
 ENV HADOOP_HOME=/opt/hadoop
 ENV HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 COPY files/install-hadoop.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
 # Hadoop configuration
 ADD files/scalable_analytics/core-site.xml $HADOOP_HOME/etc/hadoop/
@@ -109,8 +94,6 @@ RUN chown -R ${NB_USER} ${HADOOP_HOME} && \
 ENV PATH=$PATH:$HADOOP_HOME/bin
 
 # Install pgweb with platform-specific binary
-# Run pgweb from the terminal use pgweb --bind=0.0.0.0 --listen=8000
-# Once setup has been run inside the container there should be an alias pgw
 RUN . /etc/environment && \
     wget -O pgweb.zip https://github.com/sosedoff/pgweb/releases/download/v0.11.11/$PGWEB_FILE && \
     unzip pgweb.zip -d pgweb_dir && \
@@ -124,22 +107,19 @@ RUN mkdir -p /var/log/postgresql /var/log/sshd && \
 
 # Oh-my-zsh and other zsh setup
 COPY files/install-ohmyzsh.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
 # Setup the GitHub CLI
 COPY files/install-gh.sh setup.sh
-RUN chmod +x setup.sh && \
-    ./setup.sh && \
-    rm setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
-# RSM environment variables (JAVA_HOME, PYTHONPATH, etc.)
+# RSM environment variables (JAVA_HOME, SPARK_HOME, HADOOP_HOME, PYTHONPATH, etc.)
+# This script handles multi-platform detection at runtime
 COPY files/profile.d/rsm-env.sh /etc/profile.d/rsm-env.sh
 RUN chmod 644 /etc/profile.d/rsm-env.sh && \
     echo 'source /etc/profile.d/rsm-env.sh' >> /etc/zsh/zshenv
 
-# Copying over CLI scripts
+# Copy CLI scripts
 COPY files/zsh/zshrc /etc/skel/.zshrc
 COPY files/zsh/p10k.zsh /etc/skel/.p10k.zsh
 COPY files/zsh/usethis /usr/local/bin/usethis
@@ -161,11 +141,19 @@ RUN touch /var/log/sshd/sshd.log && \
     chown ${NB_USER}:${NB_GID:-users} /var/log/sshd/sshd.log && \
     chmod 640 /var/log/sshd/sshd.log
 
+# Healthcheck for PostgreSQL on port 8765
+# Checks every 30s, times out at 10s, fails after 3 consecutive failures
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD pg_isready -h localhost -p 8765 -U jovyan || exit 1
+
+# Expose non-privileged ports for rootless operation
+# 2222 - SSH
+# 8282 - pgweb
+# 8765 - PostgreSQL
 EXPOSE 2222 8282 8765
 
 CMD ["/usr/local/bin/start-container.sh"]
 
-# Switch back to jovyan to avoid accidental container runs as root
+# Run as non-root user for rootless container operation
 USER ${NB_UID}
 ENV HOME=/home/${NB_USER}
-# WORKDIR "${HOME}"

@@ -10,6 +10,8 @@
     "editor.renderWhitespace": "all",
     "editor.unicodeHighlight.ambiguousCharacters": false,
     "editor.wordWrap": "on",
+    "editor.tabCompletion": "on",
+    "editor.acceptSuggestionOnEnter": "smart",
     "files.eol": "\n",
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,
