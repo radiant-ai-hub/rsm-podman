@@ -69,7 +69,6 @@ jobs:
             VERSION=$(cat VERSION | tr -d '[:space:]')
             # For pushes to main, use VERSION file but mark as dev build
             VERSION="${VERSION}-dev.${GITHUB_SHA:0:7}"
-            PUSH_LATEST="true"
             echo "Using VERSION file with dev suffix: $VERSION"
           else
             VERSION="${{ github.sha }}"

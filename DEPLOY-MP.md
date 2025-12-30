@@ -30,11 +30,10 @@ Version is controlled by the `VERSION` file in the repository root.
 ```bash
 # 1. Update the VERSION file
 echo "2.5.0" > VERSION
-git add VERSION
+git add .
 git commit -m "Bump version to 2.5.0"
 git push origin main
-
-# 2. Create and push the release tag
+ 2. Create and push the release tag
 git tag v2.5.0
 git push origin v2.5.0
 ```
