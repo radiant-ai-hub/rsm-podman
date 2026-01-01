@@ -34,6 +34,7 @@ uv add \
   sqlalchemy \
   psycopg2 \
   scikit-learn \
+  scikit-misc \
   mlxtend \
   xgboost \
   lightgbm \
