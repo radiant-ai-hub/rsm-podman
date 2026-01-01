@@ -6,12 +6,14 @@ ARG TARGETARCH
 
 ENV IMAGE_VERSION=${IMAGE_VERSION}
 
-# Install minimal system dependencies for UV
+# Install minimal system dependencies for UV and build tools for scikit-misc (needed for ARM64)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
-        git && \
+        git \
+        build-essential \
+        python3-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
