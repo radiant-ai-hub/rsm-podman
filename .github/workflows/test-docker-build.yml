@@ -1,0 +1,234 @@
+name: Test Build - Docker (Minimal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Test version (leave empty for auto: test-SHA)'
+        required: false
+        default: ''
+      push_to_registry:
+        description: 'Push to registry (for testing manifest creation)'
+        required: false
+        default: true
+        type: boolean
+  pull_request:
+    paths:
+      - 'test-builds/docker/**'
+      - '.github/workflows/test-docker-build.yml'
+
+env:
+  TEST_IMAGE: vnijs/rsm-msba-k8s-test
+
+jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      push_to_registry: ${{ steps.get-version.outputs.push_to_registry }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: get-version
+        run: |
+          PUSH_TO_REGISTRY="${{ inputs.push_to_registry }}"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Auto-generate test version
+            VERSION="test-${GITHUB_SHA:0:7}"
+          fi
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PUSH_TO_REGISTRY="false"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "push_to_registry=$PUSH_TO_REGISTRY" >> $GITHUB_OUTPUT
+          echo "Test version: $VERSION"
+          echo "Push to registry: $PUSH_TO_REGISTRY"
+
+  build-amd64:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: needs.determine-version.outputs.push_to_registry == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push amd64 image
+        if: needs.determine-version.outputs.push_to_registry == 'true'
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --sbom=false \
+            --build-arg IMAGE_VERSION=${VERSION} \
+            --tag ${{ env.TEST_IMAGE }}:${VERSION}-amd64 \
+            --push \
+            -f test-builds/docker/Dockerfile.minimal \
+            .
+
+      - name: Build amd64 image (PR - no push)
+        if: needs.determine-version.outputs.push_to_registry == 'false'
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --build-arg IMAGE_VERSION=pr-test \
+            --tag rsm-test:pr-test \
+            -f test-builds/docker/Dockerfile.minimal \
+            .
+
+  build-arm64:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for arm64 emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: needs.determine-version.outputs.push_to_registry == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push arm64 image
+        if: needs.determine-version.outputs.push_to_registry == 'true'
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --provenance=false \
+            --sbom=false \
+            --build-arg IMAGE_VERSION=${VERSION} \
+            --tag ${{ env.TEST_IMAGE }}:${VERSION}-arm64 \
+            --push \
+            -f test-builds/docker/Dockerfile.minimal \
+            .
+
+      - name: Build arm64 image (PR - no push)
+        if: needs.determine-version.outputs.push_to_registry == 'false'
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --build-arg IMAGE_VERSION=pr-test \
+            --tag rsm-test:pr-test-arm64 \
+            -f test-builds/docker/Dockerfile.minimal \
+            .
+
+  create-manifest:
+    needs: [determine-version, build-amd64, build-arm64]
+    if: needs.determine-version.outputs.push_to_registry == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Create manifest
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          echo "Creating manifest for version: $VERSION"
+
+          # Create version manifest using tags (same approach as production)
+          docker buildx imagetools create \
+            --tag ${{ env.TEST_IMAGE }}:${VERSION} \
+            ${{ env.TEST_IMAGE }}:${VERSION}-amd64 \
+            ${{ env.TEST_IMAGE }}:${VERSION}-arm64
+
+          echo "✓ Created test manifest: ${VERSION}"
+
+          # Also create latest tag to test the full manifest creation workflow
+          echo "Creating latest tag..."
+          docker buildx imagetools create \
+            --tag ${{ env.TEST_IMAGE }}:latest \
+            ${{ env.TEST_IMAGE }}:${VERSION}-amd64 \
+            ${{ env.TEST_IMAGE }}:${VERSION}-arm64
+
+          echo "✓ Created latest tag"
+
+      - name: Verify manifest
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          echo "=== Test Manifest Inspection (Version Tag) ==="
+          docker buildx imagetools inspect ${{ env.TEST_IMAGE }}:${VERSION}
+
+          echo ""
+          echo "=== Test Manifest Inspection (Latest Tag) ==="
+          docker buildx imagetools inspect ${{ env.TEST_IMAGE }}:latest
+
+  integration-tests:
+    needs: [determine-version, create-manifest]
+    if: needs.determine-version.outputs.push_to_registry == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Pull and test image
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          echo "Testing ${{ matrix.platform }}"
+          docker pull --platform ${{ matrix.platform }} ${{ env.TEST_IMAGE }}:${VERSION}
+
+          # Run the container (test script is the default CMD)
+          docker run --rm --platform ${{ matrix.platform }} ${{ env.TEST_IMAGE }}:${VERSION}
+
+      - name: Test architecture verification
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+        run: |
+          # Verify the correct architecture was pulled
+          docker run --rm --platform ${{ matrix.platform }} ${{ env.TEST_IMAGE }}:${VERSION} \
+            python -c "import platform; print(f'Architecture: {platform.machine()}')"

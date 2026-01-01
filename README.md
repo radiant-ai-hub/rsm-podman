@@ -33,6 +33,8 @@ podman pull ghcr.io/radiant-ai-hub/rsm-podman:latest
 
 Both images support **Intel/AMD (amd64)** and **Apple Silicon (arm64)** architectures.
 
+You can inspect the images here: <https://github.com/orgs/radiant-ai-hub/packages/container/package/rsm-podman>
+
 ## Features
 
 - **Jupyter Lab**: Interactive notebook environment

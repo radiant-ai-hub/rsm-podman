@@ -151,31 +151,14 @@ jobs:
           echo "Building version: $VERSION for amd64"
           docker buildx build \
             --platform linux/amd64 \
+            --provenance=false \
+            --sbom=false \
             --build-arg IMAGE_VERSION=${VERSION} \
             --tag ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-amd64 \
             --tag ${{ env.GHCR_IMAGE }}:${VERSION}-amd64 \
             --push \
             -f docker-k8s/Dockerfile \
             .
-
-      - name: Capture amd64 image digest
-        if: github.event_name != 'pull_request'
-        env:
-          VERSION: ${{ needs.determine-version.outputs.version }}
-        run: |
-          # Get digest from Docker Hub image
-          DIGEST=$(docker buildx imagetools inspect ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-amd64 --format '{{.Manifest.Digest}}')
-          echo "Captured AMD64 digest: $DIGEST"
-          mkdir -p /tmp/digests
-          echo "$DIGEST" > /tmp/digests/amd64.txt
-
-      - name: Upload amd64 digest artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: digest-amd64
-          path: /tmp/digests/amd64.txt
-          retention-days: 1
 
       - name: Build amd64 image (PR - no push)
         if: github.event_name == 'pull_request'
@@ -255,31 +238,14 @@ jobs:
           echo "Building version: $VERSION for arm64"
           docker buildx build \
             --platform linux/arm64 \
+            --provenance=false \
+            --sbom=false \
             --build-arg IMAGE_VERSION=${VERSION} \
             --tag ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-arm64 \
             --tag ${{ env.GHCR_IMAGE }}:${VERSION}-arm64 \
             --push \
             -f docker-k8s/Dockerfile \
             .
-
-      - name: Capture arm64 image digest
-        if: github.event_name != 'pull_request'
-        env:
-          VERSION: ${{ needs.determine-version.outputs.version }}
-        run: |
-          # Get digest from Docker Hub image
-          DIGEST=$(docker buildx imagetools inspect ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-arm64 --format '{{.Manifest.Digest}}')
-          echo "Captured ARM64 digest: $DIGEST"
-          mkdir -p /tmp/digests
-          echo "$DIGEST" > /tmp/digests/arm64.txt
-
-      - name: Upload arm64 digest artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: digest-arm64
-          path: /tmp/digests/arm64.txt
-          retention-days: 1
 
       - name: Build arm64 image (PR - no push)
         if: github.event_name == 'pull_request'
@@ -301,13 +267,6 @@ jobs:
       packages: write
 
     steps:
-      - name: Download digest artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digest-*
-          merge-multiple: true
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -329,19 +288,13 @@ jobs:
           VERSION: ${{ needs.determine-version.outputs.version }}
           PUSH_LATEST: ${{ needs.determine-version.outputs.push_latest }}
         run: |
-          # Read digests
-          AMD64_DIGEST=$(cat /tmp/digests/amd64.txt)
-          ARM64_DIGEST=$(cat /tmp/digests/arm64.txt)
-
           echo "Creating Docker Hub manifest for version: $VERSION"
-          echo "AMD64 digest: $AMD64_DIGEST"
-          echo "ARM64 digest: $ARM64_DIGEST"
 
-          # Create version manifest using digests
+          # Create version manifest using tags
           docker buildx imagetools create \
             --tag ${{ env.DOCKERHUB_IMAGE }}:${VERSION} \
-            ${{ env.DOCKERHUB_IMAGE }}@${AMD64_DIGEST} \
-            ${{ env.DOCKERHUB_IMAGE }}@${ARM64_DIGEST}
+            ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-amd64 \
+            ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-arm64
 
           echo "✓ Created Docker Hub version manifest: ${VERSION}"
 
@@ -350,8 +303,8 @@ jobs:
             echo "Creating Docker Hub latest manifest..."
             docker buildx imagetools create \
               --tag ${{ env.DOCKERHUB_IMAGE }}:latest \
-              ${{ env.DOCKERHUB_IMAGE }}@${AMD64_DIGEST} \
-              ${{ env.DOCKERHUB_IMAGE }}@${ARM64_DIGEST}
+              ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-amd64 \
+              ${{ env.DOCKERHUB_IMAGE }}:${VERSION}-arm64
             echo "✓ Created Docker Hub latest manifest"
           else
             echo "Skipping latest tag (not a release build)"
@@ -362,17 +315,13 @@ jobs:
           VERSION: ${{ needs.determine-version.outputs.version }}
           PUSH_LATEST: ${{ needs.determine-version.outputs.push_latest }}
         run: |
-          # Read digests
-          AMD64_DIGEST=$(cat /tmp/digests/amd64.txt)
-          ARM64_DIGEST=$(cat /tmp/digests/arm64.txt)
-
           echo "Creating GHCR manifest for version: $VERSION"
 
-          # Create version manifest using digests
+          # Create version manifest using tags
           docker buildx imagetools create \
             --tag ${{ env.GHCR_IMAGE }}:${VERSION} \
-            ${{ env.GHCR_IMAGE }}@${AMD64_DIGEST} \
-            ${{ env.GHCR_IMAGE }}@${ARM64_DIGEST}
+            ${{ env.GHCR_IMAGE }}:${VERSION}-amd64 \
+            ${{ env.GHCR_IMAGE }}:${VERSION}-arm64
 
           echo "✓ Created GHCR version manifest: ${VERSION}"
 
@@ -381,8 +330,8 @@ jobs:
             echo "Creating GHCR latest manifest..."
             docker buildx imagetools create \
               --tag ${{ env.GHCR_IMAGE }}:latest \
-              ${{ env.GHCR_IMAGE }}@${AMD64_DIGEST} \
-              ${{ env.GHCR_IMAGE }}@${ARM64_DIGEST}
+              ${{ env.GHCR_IMAGE }}:${VERSION}-amd64 \
+              ${{ env.GHCR_IMAGE }}:${VERSION}-arm64
             echo "✓ Created GHCR latest manifest"
           else
             echo "Skipping latest tag (not a release build)"

@@ -1,0 +1,42 @@
+FROM python:3.13-slim
+
+ARG IMAGE_VERSION=test
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
+ENV IMAGE_VERSION=${IMAGE_VERSION}
+
+# Install minimal system dependencies for UV
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        git && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install UV
+RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+
+# Create project directory
+WORKDIR /opt/test-pyrsm
+
+# Initialize UV project and install pyrsm with core dependencies
+RUN uv init --python ">=3.13,<3.14" && \
+    uv venv && \
+    . .venv/bin/activate && \
+    uv add pyrsm numpy pandas polars matplotlib plotnine scipy scikit-learn IPython pyarrow \
+        --default-index https://pypi.org/simple/
+
+# Copy test script
+COPY test-builds/docker/test-pyrsm.py /opt/test-pyrsm/
+
+# Set environment to use UV venv
+ENV PATH="/opt/test-pyrsm/.venv/bin:$PATH"
+
+# Simple healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=2 \
+    CMD python -c "import pyrsm" || exit 1
+
+# Default command runs tests
+CMD ["python", "test-pyrsm.py"]

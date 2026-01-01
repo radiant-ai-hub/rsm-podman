@@ -32,7 +32,7 @@ uv add \
   pyrsm \
   scipy \
   sqlalchemy \
-  psycopg2[binary] \
+  psycopg2 \
   scikit-learn \
   mlxtend \
   xgboost \
@@ -103,6 +103,12 @@ uv add \
 # Install environment packages
 uv add \
   python-dotenv \
+  --default-index https://pypi.org/simple/
+
+# Install jupyter components packages
+uv add \
+  tqdm \
+  ipywidgets \
   --default-index https://pypi.org/simple/
 
 # Install bash_kernel separately to avoid dependency conflicts
