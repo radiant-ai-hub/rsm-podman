@@ -22,7 +22,7 @@ ARG TARGETARCH
 ENV NB_USER=${NB_USER:-jovyan}
 
 # Quarto version
-ENV QUARTO_VERSION="1.9.13"
+ENV QUARTO_VERSION="1.8.26"
 ENV PATH="/usr/local/bin:$PATH"
 
 # Postgres env variables

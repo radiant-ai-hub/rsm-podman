@@ -8,7 +8,7 @@ This guide covers building and deploying multi-platform (AMD64 and ARM64) contai
 
 ```bash
 # Bump version and trigger all builds automatically
-just bump 2.6.2
+just bump 2.6.4
 ```
 
 **Available Commands:**
