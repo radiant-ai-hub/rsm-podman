@@ -1,19 +1,17 @@
-# Use docker format for Podman to support HEALTHCHECK
-FROM python:3.13-slim
+# Multi-stage Containerfile for Podman: Stage 1 - Builder with all compilation tools
+FROM python:3.13-slim AS builder
 
-ARG IMAGE_VERSION=test
 ARG TARGETPLATFORM
 ARG TARGETARCH
 
-ENV IMAGE_VERSION=${IMAGE_VERSION}
-
-# Install minimal system dependencies for UV and build tools for scikit-misc (needed for ARM64)
+# Install build tools and Fortran compiler needed for ARM64 builds of scikit-misc
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
         git \
         build-essential \
+        gfortran \
         python3-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -25,16 +23,38 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/
 WORKDIR /opt/test-pyrsm
 
 # Initialize UV project and install pyrsm with core dependencies
+# This compiles everything including scikit-misc
 RUN uv init --python ">=3.13,<3.14" && \
     uv venv && \
     . .venv/bin/activate && \
     uv add pyrsm numpy pandas polars matplotlib plotnine scipy scikit-learn IPython pyarrow \
         --default-index https://pypi.org/simple/
 
-# Copy test script
-COPY test-builds/docker/test-pyrsm.py /opt/test-pyrsm/
 
-# Set environment to use UV venv
+# Multi-stage Containerfile: Stage 2 - Minimal final image (no compilers, docker format for HEALTHCHECK)
+FROM python:3.13-slim
+
+ARG IMAGE_VERSION=test
+
+ENV IMAGE_VERSION=${IMAGE_VERSION}
+
+# Only install runtime dependencies (no build tools)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the compiled virtual environment from builder
+COPY --from=builder /opt/test-pyrsm /opt/test-pyrsm
+
+# Copy test script
+COPY test-builds/docker/test-pyrsm.py /opt/test-pyrsm/test-pyrsm.py
+
+# Set working directory
+WORKDIR /opt/test-pyrsm
+
+# Set environment to use venv
 ENV PATH="/opt/test-pyrsm/.venv/bin:$PATH"
 
 # Simple healthcheck
