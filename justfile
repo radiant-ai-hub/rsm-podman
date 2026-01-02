@@ -69,8 +69,7 @@ CURRENT_PLATFORM := `uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'`
     echo "  just clean-builder         Remove buildx builder"
     echo ""
 
-status:
-    #!/bin/bash
+@status:
     echo "🔍 Build Environment Status"
     echo "=============================="
     echo ""
