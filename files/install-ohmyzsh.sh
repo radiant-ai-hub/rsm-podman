@@ -1,4 +1,6 @@
-#!/usr/bin/env bashset -e
+#!/usr/bin/env bash
+
+set -e
 
 export ZSH="/home/${NB_USER}/.rsm-msba/zsh/.oh-my-zsh"
 

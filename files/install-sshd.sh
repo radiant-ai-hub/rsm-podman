@@ -1,4 +1,6 @@
-#!/usr/bin/env bashset -e
+#!/usr/bin/env bash
+
+set -e
 
 # Install required packages
 apt update -qq

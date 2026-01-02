@@ -1,4 +1,6 @@
-#!/usr/bin/env bashset -e  # Exit on error
+#!/usr/bin/env bash
+
+set -e  # Exit on error
 
 echo "Installing packages that are needed for all next steps"
 
