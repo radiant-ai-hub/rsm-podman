@@ -1,5 +1,4 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bashset -e
 
 echo "Starting SSHD service..."
 /usr/sbin/sshd -o PidFile=/tmp/sshd.pid -E /var/log/sshd/sshd.log

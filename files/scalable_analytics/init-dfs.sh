@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 mkdir -p /tmp/hadoop-root/dfs/name
 mkdir -p /tmp/hadoop-jovyan/dfs/data
 sed -i '$a\# Add the line for suppressing the NativeCodeLoader warning \nlog4j.logger.org.apache.hadoop.util.NativeCodeLoader=ERROR,console' /$HADOOP_HOME/etc/hadoop/log4j.properties

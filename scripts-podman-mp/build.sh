@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # Simple build wrapper that handles logging and opens logs in VS Code
 VERSION="${1:-latest}"
 

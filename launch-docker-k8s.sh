@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 ## create lock file path in user's home directory
 if [ ! -d "${HOME}/.rsm-msba" ]; then
   mkdir -p "${HOME}/.rsm-msba"

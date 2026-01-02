@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # RSM CLI Menu
 while true; do
     clear

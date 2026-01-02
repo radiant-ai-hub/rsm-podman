@@ -1,5 +1,4 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bashset -e
 
 if [ ! -d "${HADOOP_HOME}" ]; then
   mkdir $HADOOP_HOME

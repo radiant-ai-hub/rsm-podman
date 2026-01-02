@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # PostgreSQL installation script for multi-platform Docker builds
 # Uses direct pg_ctl commands to avoid init.d script issues
 

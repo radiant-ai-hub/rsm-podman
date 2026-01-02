@@ -1,5 +1,4 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bashset -e
 
 apt update -qq || { echo "Failed to update package list"; exit 1; }
 apt -y install libpq-dev libssl-dev

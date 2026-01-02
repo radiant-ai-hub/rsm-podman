@@ -1,5 +1,4 @@
-#!/bin/bash
-# RSM environment variables - sourced by login shells
+#!/usr/bin/env bash# RSM environment variables - sourced by login shells
 
 # JAVA_HOME: Source from /etc/environment (set at build time) or detect
 if [ -f /etc/environment ]; then

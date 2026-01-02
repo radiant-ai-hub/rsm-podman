@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 ## based on https://stackoverflow.com/a/32723285/1974918
 running=$(docker ps -q)
 if [ "${running}" != "" ]; then
@@ -24,4 +23,3 @@ if [ "${procs}" != "" ]; then
 else
   echo "No processes to purge"
 fi
-

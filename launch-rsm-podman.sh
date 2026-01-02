@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 ## Podman launch script for rsm-podman
 ## Supports both local builds and GHCR images
 

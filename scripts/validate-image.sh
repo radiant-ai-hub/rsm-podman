@@ -1,5 +1,4 @@
-#!/bin/bash
-# Validate that required environment variables are set in the container image
+#!/usr/bin/env bash# Validate that required environment variables are set in the container image
 # Usage: ./scripts/validate-image.sh [image:tag] [docker|podman]
 
 set -e

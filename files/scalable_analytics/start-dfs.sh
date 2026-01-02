@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 echo "Starting HDFS ..."
 
 hdfs --daemon start namenode

@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # Interactive script to call usethis with user-provided arguments
 
 echo "=== Interactive usethis downloader ==="

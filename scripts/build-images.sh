@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 IMAGE_VERSION=2.1.0
 IMAGE_USERNAME=vnijs
 UPLOAD="NO"

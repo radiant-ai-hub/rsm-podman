@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 set -e
 
 # apt update -qq || { echo "Failed to update package list"; exit 1; }

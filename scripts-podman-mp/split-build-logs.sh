@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 # Script to split multi-platform build logs by platform
 # Usage: split-build-logs.sh <input-log-file> <output-directory>
 
@@ -48,7 +47,7 @@ while IFS= read -r line; do
     else
         # General log line or we don't know the platform yet
         echo "$line" >> "$general_file"
-        
+
         # Also append to platform-specific logs if we're in a platform context
         if [ "$current_platform" = "amd64" ]; then
             echo "$line" >> "$amd64_file"
@@ -61,7 +60,7 @@ done < "$INPUT_LOG"
 echo "Log splitting complete!"
 echo "Created files:"
 echo "  - AMD64 logs: $amd64_file"
-echo "  - ARM64 logs: $arm64_file"  
+echo "  - ARM64 logs: $arm64_file"
 echo "  - General logs: $general_file"
 
 # Show file sizes
