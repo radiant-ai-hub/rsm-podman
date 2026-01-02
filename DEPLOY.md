@@ -7,6 +7,9 @@ This guide covers building and deploying multi-platform (AMD64 and ARM64) contai
 **Most Common Command:**
 
 ```bash
+# Make sure to commit (but don't push) any local changes first
+git status
+
 # Bump version and trigger all builds automatically
 just bump 2.6.4
 ```

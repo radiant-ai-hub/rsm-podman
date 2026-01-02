@@ -140,6 +140,7 @@ COPY --from=builder /var/lib/postgresql /var/lib/postgresql
 COPY --from=builder /etc/postgresql /etc/postgresql
 COPY --from=builder /etc/ssh /etc/ssh
 COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /usr/local/share/quarto /usr/local/share/quarto
 
 # Install only runtime dependencies (no build tools)
 RUN apt-get update && \
