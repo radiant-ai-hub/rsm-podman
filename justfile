@@ -98,7 +98,7 @@ CURRENT_PLATFORM := `uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'`
 # =============================================================================
 
 @bump new_version:
-    #!/bin/bash
+    #!/usr/bin/env bash
     set -e
 
     OLD_VERSION=$(cat {{ VERSION_FILE }})
