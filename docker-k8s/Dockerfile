@@ -77,10 +77,6 @@ RUN chmod +x /usr/local/bin/init-postgres-db.sh
 COPY files/install-sshd.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
-# Install Quarto
-COPY files/install-quarto.sh setup.sh
-RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
-
 # Install uv package manager and python packages
 COPY files/install-uv.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
@@ -125,7 +121,6 @@ COPY --from=builder /var/lib/postgresql /var/lib/postgresql
 COPY --from=builder /etc/postgresql /etc/postgresql
 COPY --from=builder /etc/ssh /etc/ssh
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /usr/local/share/quarto /usr/local/share/quarto
 
 # Install only runtime dependencies (no build tools)
 RUN apt-get update && \
@@ -220,6 +215,10 @@ RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
 # Setup the GitHub CLI
 COPY files/install-gh.sh setup.sh
+RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
+
+# Install Quarto in Stage 2 (final image)
+COPY files/install-quarto.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 
 # RSM environment variables (JAVA_HOME, SPARK_HOME, HADOOP_HOME, PYTHONPATH, etc.)
