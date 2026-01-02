@@ -20,8 +20,7 @@ CURRENT_PLATFORM := `uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'`
 
 # Get current version from VERSION file
 @_get_version:
-    #!/bin/bash
-    cat {{ VERSION_FILE }}
+    !/usr/bin/env bash    cat {{ VERSION_FILE }}
 
 # =============================================================================
 # Help and Status
@@ -151,8 +150,21 @@ CURRENT_PLATFORM := `uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'`
     echo "✨ Version bump complete!"
     echo ""
     echo "📢 Next steps:"
-    echo "  1. Production Docker builds will trigger automatically on tag"
-    echo "  2. Test builds can be triggered with:"
+    echo ""
+    echo "  1️⃣  Monitor GitHub Actions builds:"
+    echo "     https://github.com/radiant-ai-hub/rsm-podman/actions"
+    echo ""
+    echo "  2️⃣  View built images:"
+    echo "     Docker Hub (vnijs/rsm-msba-k8s):"
+    echo "     https://hub.docker.com/r/vnijs/rsm-msba-k8s/tags"
+    echo ""
+    echo "     GHCR Docker (rsm-msba-k8s):"
+    echo "     https://github.com/radiant-ai-hub/rsm-podman/pkgs/container/rsm-msba-k8s"
+    echo ""
+    echo "     GHCR Podman (rsm-podman):"
+    echo "     https://github.com/radiant-ai-hub/rsm-podman/pkgs/container/rsm-podman"
+    echo ""
+    echo "  3️⃣  Optionally test with minimal images first:"
     echo "     just test-build-docker $NEW_VERSION"
     echo "     just test-build-podman $NEW_VERSION"
     echo ""
@@ -162,14 +174,14 @@ CURRENT_PLATFORM := `uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'`
 # =============================================================================
 
 check-docker:
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo "🔍 Checking Docker setup..."
     docker info > /dev/null 2>&1 || (echo "❌ Docker is not running" && exit 1)
     docker buildx version > /dev/null 2>&1 || (echo "❌ Docker buildx is not available" && exit 1)
     echo "✓ Docker and buildx are available"
 
 setup-builder: check-docker
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo "🔧 Setting up buildx builder..."
     if ! docker buildx ls | grep -q "{{ DOCKER_BUILDER }}"; then
         echo "📦 Creating new builder: {{ DOCKER_BUILDER }}"
@@ -182,8 +194,7 @@ setup-builder: check-docker
     docker buildx inspect --bootstrap
 
 login:
-    #!/bin/bash
-    echo "🔐 Logging in to Docker Hub..."
+    #!/usr/bin/env bash    echo "🔐 Logging in to Docker Hub..."
     if [ -n "$DOCKER_TOKEN" ]; then
         echo "Using DOCKER_TOKEN from environment"
         echo "$DOCKER_TOKEN" | docker login --username vnijs --password-stdin
@@ -193,8 +204,7 @@ login:
     fi
 
 test-auth:
-    #!/bin/bash
-    echo "🧪 Testing Docker Hub authentication..."
+    #!/usr/bin/env bash    echo "🧪 Testing Docker Hub authentication..."
     if docker manifest inspect {{ DOCKER_IMAGE }}:latest > /dev/null 2>&1; then
         echo "✓ Authentication working - you have access to {{ DOCKER_IMAGE }}"
     else
@@ -202,8 +212,7 @@ test-auth:
     fi
 
 test: setup-builder
-    #!/bin/bash
-    set -e
+    #!/usr/bin/env bash    set -e
     echo "🔨 Building test image for linux/{{ CURRENT_PLATFORM }}..."
     mkdir -p build-logs
     docker buildx build \
@@ -217,8 +226,7 @@ test: setup-builder
     echo "✓ Test build complete: {{ DOCKER_IMAGE }}:latest"
 
 build: setup-builder test-auth
-    #!/bin/bash
-    set -e
+    #!/usr/bin/env bash    set -e
     VERSION=$(cat {{ VERSION_FILE }})
     echo "🔨 Building multi-platform image: {{ DOCKER_IMAGE }}:$VERSION"
     echo "📍 Platforms: {{ PLATFORMS }}"
@@ -238,8 +246,7 @@ build: setup-builder test-auth
     docker buildx imagetools inspect {{ DOCKER_IMAGE }}:$VERSION
 
 build-no-cache: setup-builder test-auth
-    #!/bin/bash
-    set -e
+    #!/usr/bin/env bash    set -e
     VERSION=$(cat {{ VERSION_FILE }})
     echo "🔨 Building multi-platform image (no cache): {{ DOCKER_IMAGE }}:$VERSION"
     echo "📍 Platforms: {{ PLATFORMS }}"
@@ -257,8 +264,7 @@ build-no-cache: setup-builder test-auth
     echo "✓ Build complete and pushed to Docker Hub"
 
 inspect:
-    #!/bin/bash
-    VERSION=$(cat {{ VERSION_FILE }})
+    #!/usr/bin/env bash    VERSION=$(cat {{ VERSION_FILE }})
     echo "🔍 Inspecting {{ DOCKER_IMAGE }}:$VERSION"
     docker buildx imagetools inspect {{ DOCKER_IMAGE }}:$VERSION
 
@@ -267,14 +273,12 @@ inspect:
 # =============================================================================
 
 check-podman:
-    #!/bin/bash
-    echo "🔍 Checking Podman setup..."
+    #!/usr/bin/env bash    echo "🔍 Checking Podman setup..."
     podman --version > /dev/null 2>&1 || (echo "❌ Podman is not installed" && exit 1)
     echo "✓ Podman is available"
 
 podman-login: check-podman
-    #!/bin/bash
-    echo "🔐 Logging in to GHCR..."
+    #!/usr/bin/env bash    echo "🔐 Logging in to GHCR..."
     if command -v gh >/dev/null 2>&1; then
         echo "Using gh auth token"
         unset GH_TOKEN && gh auth token | podman login ghcr.io --username vnijs --password-stdin
@@ -284,8 +288,7 @@ podman-login: check-podman
     fi
 
 podman-test: check-podman
-    #!/bin/bash
-    set -e
+    #!/usr/bin/env bash    set -e
     echo "🔨 Building Podman test image for linux/{{ CURRENT_PLATFORM }}..."
     mkdir -p build-logs
     podman build \
@@ -298,8 +301,7 @@ podman-test: check-podman
     echo "✓ Podman test build complete: {{ PODMAN_IMAGE }}:test"
 
 podman-build: check-podman podman-login
-    #!/bin/bash
-    set -e
+    #!/usr/bin/env bash    set -e
     VERSION=$(cat {{ VERSION_FILE }})
     echo "🔨 Building multi-platform Podman image: {{ PODMAN_IMAGE }}:$VERSION"
     echo "📍 Platforms: {{ PLATFORMS }}"
@@ -327,8 +329,7 @@ podman-build: check-podman podman-login
     echo "✓ Build complete and pushed to GHCR"
 
 podman-build-no-cache: check-podman podman-login
-    #!/bin/bash
-    set -e
+    #!/usr/bin/env bash    set -e
     VERSION=$(cat {{ VERSION_FILE }})
     echo "🔨 Building multi-platform Podman image (no cache): {{ PODMAN_IMAGE }}:$VERSION"
     mkdir -p build-logs
@@ -355,8 +356,7 @@ podman-build-no-cache: check-podman podman-login
     echo "✓ Build complete and pushed to GHCR"
 
 podman-inspect:
-    #!/bin/bash
-    VERSION=$(cat {{ VERSION_FILE }})
+    #!/usr/bin/env bash    VERSION=$(cat {{ VERSION_FILE }})
     echo "🔍 Inspecting {{ PODMAN_IMAGE }}:$VERSION"
     podman manifest inspect {{ PODMAN_IMAGE }}:$VERSION
 
@@ -365,8 +365,7 @@ podman-inspect:
 # =============================================================================
 
 test-build-docker version="":
-    #!/bin/bash
-    VERSION="{{ version }}"
+    #!/usr/bin/env bash    VERSION="{{ version }}"
 
     if [ -z "$VERSION" ]; then
         echo "🚀 Triggering Test Docker Build with auto-generated version..."
@@ -394,8 +393,7 @@ test-build-docker version="":
     echo ""
 
 test-build-podman version="":
-    #!/bin/bash
-    VERSION="{{ version }}"
+    #!/usr/bin/env bash    VERSION="{{ version }}"
 
     if [ -z "$VERSION" ]; then
         echo "🚀 Triggering Test Podman Build with auto-generated version..."
@@ -427,30 +425,25 @@ test-build-podman version="":
 # =============================================================================
 
 clean-logs:
-    #!/bin/bash
-    echo "🧹 Cleaning build logs..."
+    #!/usr/bin/env bash    echo "🧹 Cleaning build logs..."
     rm -rf build-logs/*
     echo "✓ Logs cleaned"
 
 clean-test-images:
-    #!/bin/bash
-    echo "🧹 Removing test images..."
+    #!/usr/bin/env bash    echo "🧹 Removing test images..."
     docker rmi {{ DOCKER_IMAGE }}:latest 2>/dev/null || true
     echo "✓ Test images removed"
 
 podman-clean:
-    #!/bin/bash
-    echo "🧹 Removing Podman test images..."
+    #!/usr/bin/env bash    echo "🧹 Removing Podman test images..."
     podman rmi {{ PODMAN_IMAGE }}:test 2>/dev/null || true
     podman rmi {{ PODMAN_IMAGE }} 2>/dev/null || true
     echo "✓ Podman test images removed"
 
 clean-builder:
-    #!/bin/bash
-    echo "🧹 Removing buildx builder: {{ DOCKER_BUILDER }}"
+    #!/usr/bin/env bash    echo "🧹 Removing buildx builder: {{ DOCKER_BUILDER }}"
     docker buildx rm {{ DOCKER_BUILDER }} || true
     echo "✓ Builder removed"
 
 clean: clean-test-images clean-logs podman-clean
-    #!/bin/bash
-    echo "✓ Cleanup complete"
+    #!/usr/bin/env bash    echo "✓ Cleanup complete"
