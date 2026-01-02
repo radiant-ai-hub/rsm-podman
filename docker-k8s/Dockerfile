@@ -4,7 +4,8 @@
 
 # Use the latest tag and let Docker buildx handle platform selection automatically
 # Updated to match the latest versions from individual Dockerfiles
-FROM quay.io/jupyter/pyspark-notebook:2025-12-15
+# Multi-stage build: Stage 1 - Builder with compilation tools for ARM64 scikit-misc support
+FROM quay.io/jupyter/pyspark-notebook:2025-12-15 AS builder
 
 USER root
 
@@ -47,6 +48,15 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 # Source the environment file to make PGWEB_FILE available for build
 RUN . /etc/environment
 
+# Install build tools for Python package compilation (required for ARM64 scikit-misc)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        gfortran \
+        python3-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install base packages
 COPY files/init-apt.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
@@ -74,6 +84,104 @@ RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
 # Install uv package manager and python packages
 COPY files/install-uv.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh
+
+# ============================================================================
+# Multi-stage build: Stage 2 - Final image (no build tools, minimal runtime)
+# ============================================================================
+
+FROM quay.io/jupyter/pyspark-notebook:2025-12-15
+
+USER root
+
+# Define build argument and set it as an environment variable
+ARG IMAGE_VERSION=latest
+ENV IMAGE_VERSION=${IMAGE_VERSION}
+
+# Get platform info for conditional logic
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
+# Ensure NB_USER is set
+ENV NB_USER=${NB_USER:-jovyan}
+
+# Quarto version
+ENV QUARTO_VERSION="1.9.13"
+ENV PATH="/usr/local/bin:$PATH"
+
+# Postgres env variables
+ENV POSTGRES_VERSION=16
+ENV PGPASSWORD=postgres
+
+# Jupyter and shell environment setup
+ARG RSMBASE=/home/${NB_USER}/.rsm-msba
+ENV RSMBASE=${RSMBASE} \
+    SHELL=/bin/zsh \
+    ZDOTDIR=/home/${NB_USER}/.rsm-msba/zsh
+
+# Copy compiled artifacts from builder
+COPY --from=builder /opt/base-uv /opt/base-uv
+COPY --from=builder /var/lib/postgresql /var/lib/postgresql
+COPY --from=builder /etc/postgresql /etc/postgresql
+COPY --from=builder /etc/ssh /etc/ssh
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Install only runtime dependencies (no build tools)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        # Runtime libraries for compiled Python packages
+        libpq5 \
+        libssl3 \
+        ca-certificates \
+        # PostgreSQL runtime
+        postgresql-client-16 \
+        # SSH runtime
+        openssh-server \
+        # System utilities (from init-apt.sh pattern)
+        sudo \
+        gosu \
+        curl \
+        wget \
+        git \
+        git-lfs \
+        rsync \
+        zsh \
+        autojump \
+        vim \
+        vifm \
+        htop \
+        lsof \
+        rename \
+        lsb-release \
+        gdebi-core \
+        locales \
+        liblzma5 \
+        liblzma-dev && \
+    apt-get clean && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Configure locales
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && \
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && \
+    update-ca-certificates -f && \
+    # Setup user permissions
+    echo "jovyan ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/jovyan && \
+    chmod 0440 /etc/sudoers.d/jovyan && \
+    # Set shell
+    usermod -s /bin/zsh jovyan
+
+# Set platform-specific variables for build time (PGWEB_FILE needed for binary download)
+RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+    echo "export PGWEB_FILE=pgweb_linux_arm64_v7.zip" >> /etc/environment; \
+    elif [ "${TARGETARCH}" = "amd64" ]; then \
+    echo "export PGWEB_FILE=pgweb_linux_amd64.zip" >> /etc/environment; \
+    else \
+    echo "Unsupported architecture: ${TARGETARCH}" && exit 1; \
+    fi
+
+# Source the environment file to make PGWEB_FILE available for build
+RUN . /etc/environment
 
 # Setup Hadoop
 ENV HADOOP_VERSION=3.3.4
