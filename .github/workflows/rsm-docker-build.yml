@@ -2,20 +2,8 @@ name: Build rsm-msba-k8s (Docker)
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'docker-k8s/**'
-      - 'files/**'
-      - 'scripts-docker-mp/**'
-      - '.github/workflows/rsm-docker-build.yml'
-      - 'VERSION'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'docker-k8s/**'
-      - 'files/**'
   workflow_dispatch:
     inputs:
       version:
@@ -97,6 +85,20 @@ jobs:
       packages: write
 
     steps:
+      - name: Move Docker data root to /mnt
+        run: |
+          sudo systemctl stop docker
+          sudo mkdir -p /mnt/docker-data
+          echo '{"data-root":"/mnt/docker-data"}' | sudo tee /etc/docker/daemon.json
+          sudo rm -rf /var/lib/docker
+          sudo systemctl start docker
+          docker info | grep "Docker Root Dir"
+
+      - name: Show Docker info
+        run: |
+          docker info
+          df -h
+
       - name: Free up disk space
         run: |
           echo "Before cleanup:"

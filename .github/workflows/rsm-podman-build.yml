@@ -1,21 +1,6 @@
 name: Build rsm-podman
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'rsm-podman/**'
-      - 'files/**'
-      - 'scripts-podman-mp/**'
-      - '.github/workflows/rsm-podman-build.yml'
-      - 'VERSION'
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'rsm-podman/**'
-      - 'files/**'
   workflow_dispatch:
     inputs:
       version:

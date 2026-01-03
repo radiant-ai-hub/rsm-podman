@@ -1,4 +1,5 @@
-#!/usr/bin/env bash# script to use for SQL+ETL course
+#!/usr/bin/env bash
+# script to use for SQL+ETL course
 # run from a terminal in VSCODE
 
 cd ~
