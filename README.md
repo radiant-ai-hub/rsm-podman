@@ -37,7 +37,7 @@ You can inspect the images here: <https://github.com/orgs/radiant-ai-hub/package
 
 ## Features
 
-- **Jupyter Lab**: Interactive notebook environment
+- **Jupyter**: Interactive notebook in VS Coe
 - **PySpark**: Apache Spark with Python bindings
 - **Hadoop 3.3.4**: Distributed storage and processing
 - **PostgreSQL 16**: Relational database with pgweb interface

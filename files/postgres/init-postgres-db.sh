@@ -1,4 +1,5 @@
-#!/usr/bin/env bash# Shared PostgreSQL initialization script
+#!/usr/bin/env bash
+# Shared PostgreSQL initialization script
 # Used by both install scripts (build time) and start-container.sh (runtime)
 set -e
 

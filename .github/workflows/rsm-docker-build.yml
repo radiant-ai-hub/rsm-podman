@@ -380,6 +380,8 @@ jobs:
           sudo apt-get autoremove -y
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
+          # Prune Docker to free layer cache and unused images
+          docker system prune -af --volumes || true
           echo "After cleanup:"
           df -h
 

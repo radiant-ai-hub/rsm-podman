@@ -134,6 +134,9 @@ ENV RSMBASE=${RSMBASE} \
 COPY --from=builder /opt/base-uv /opt/base-uv
 COPY --from=builder /var/lib/postgresql /var/lib/postgresql
 COPY --from=builder /etc/postgresql /etc/postgresql
+COPY --from=builder /usr/lib/postgresql /usr/lib/postgresql
+COPY --from=builder /usr/share/postgresql /usr/share/postgresql
+COPY --from=builder /var/run/postgresql /var/run/postgresql
 COPY --from=builder /etc/ssh /etc/ssh
 COPY --from=builder /usr/local/bin /usr/local/bin
 

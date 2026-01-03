@@ -13,8 +13,8 @@ apt update -qq && apt -y --no-install-recommends install \
 
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-curl -sL --retry 3 \
-  "http://archive.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz" \
+curl -fL --retry 3 --retry-delay 5 --retry-max-time 300 \
+  "https://archive.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz" \
   | gunzip \
   | tar -x --strip-components=1 -C $HADOOP_HOME && \
   rm -rf $HADOOP_HOME/share/doc && \

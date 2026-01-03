@@ -11,7 +11,7 @@ This guide covers building and deploying multi-platform (AMD64 and ARM64) contai
 git status
 
 # Bump version and trigger all builds automatically
-just bump 2.6.4
+just bump 2.6.6
 ```
 
 **Available Commands:**
