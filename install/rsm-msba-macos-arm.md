@@ -82,7 +82,7 @@ The final steps are:
 
 ## Using UV
 
-The RSM-MSBA docker image uses UV for Python package management, virtual environments, and installing different versions of Python. To learn more about UV see `<a href="https://docs.astral.sh/uv/" target="_blank">https://docs.astral.sh/uv/</a>`.
+The RSM-MSBA docker image uses UV for Python package management, virtual environments, and installing different versions of Python. To learn more about UV see <a href="https://docs.astral.sh/uv/" target="_blank">https://docs.astral.sh/uv/</a>.
 It is important to realize that the RSM-MSBA docker container will reset itself completely when it is restarted (i.e., it always starts from the same docker image). This means that we can install Python packages that will **not** persist after restarting the docker container, which can be convenient if we want to experiment without worrying about "breaking" anything. To add to the main Python environment inside the docker container, we can enter code like the below from a terminal in VS Code:
 
 ```bash
