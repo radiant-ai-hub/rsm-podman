@@ -13,11 +13,20 @@ echo "Starting PostgreSQL service..."
 # Start PostgreSQL
 /usr/lib/postgresql/${POSTGRES_VERSION}/bin/postgres \
     -c config_file=/etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf &
+POSTGRES_PID=$!
 
 echo "All services started. Tailing logs..."
-tail -f /var/log/sshd/sshd.log &
-sleep 2
-tail -f /var/log/postgresql/postgresql-*.log 2>/dev/null &
+tail -F /var/log/sshd/sshd.log >/dev/null 2>&1 &
 
-# Wait for all background processes
-wait -n
+# Wait briefly for PostgreSQL logs to appear before tailing
+for i in {1..30}; do
+  if ls /var/log/postgresql/postgresql-*.log >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+tail -F /var/log/postgresql/postgresql-*.log >/dev/null 2>&1 || true &
+
+# Keep container alive as long as PostgreSQL is running
+wait ${POSTGRES_PID}
