@@ -119,6 +119,61 @@ local-integration-tests:
         exit 1
     fi
 
+    # Ensure tag-triggered workflows are enabled
+    if ! rg -n "push:\\s*\\n\\s*tags:" .github/workflows/rsm-docker-build.yml >/dev/null; then
+        echo "⚠️  Docker workflow missing tag trigger. Patching it now..."
+        python - <<'PY'
+from pathlib import Path
+path = Path(".github/workflows/rsm-docker-build.yml")
+text = path.read_text()
+if "on:" not in text:
+    raise SystemExit("Missing 'on:' in Docker workflow")
+lines = text.splitlines()
+out = []
+inserted = False
+for i, line in enumerate(lines):
+    out.append(line)
+    if line.strip() == "on:":
+        # Insert tag trigger immediately after "on:"
+        out.append("  push:")
+        out.append("    tags:")
+        out.append("      - 'v[0-9]+.[0-9]+.[0-9]+'")
+        inserted = True
+        # Skip existing push block if present later? Leave as-is for minimal edit.
+        break
+if not inserted:
+    raise SystemExit("Failed to insert tag trigger for Docker workflow")
+out.extend(lines[len(out)-1:])
+path.write_text("\n".join(out) + "\n")
+PY
+    fi
+
+    if ! rg -n "push:\\s*\\n\\s*tags:" .github/workflows/rsm-podman-build.yml >/dev/null; then
+        echo "⚠️  Podman workflow missing tag trigger. Patching it now..."
+        python - <<'PY'
+from pathlib import Path
+path = Path(".github/workflows/rsm-podman-build.yml")
+text = path.read_text()
+if "on:" not in text:
+    raise SystemExit("Missing 'on:' in Podman workflow")
+lines = text.splitlines()
+out = []
+inserted = False
+for i, line in enumerate(lines):
+    out.append(line)
+    if line.strip() == "on:":
+        out.append("  push:")
+        out.append("    tags:")
+        out.append("      - 'v[0-9]+.[0-9]+.[0-9]+'")
+        inserted = True
+        break
+if not inserted:
+    raise SystemExit("Failed to insert tag trigger for Podman workflow")
+out.extend(lines[len(out)-1:])
+path.write_text("\n".join(out) + "\n")
+PY
+    fi
+
     # Update VERSION file
     echo "📝 Updating {{ VERSION_FILE }}..."
     echo "$NEW_VERSION" > {{ VERSION_FILE }}

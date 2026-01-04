@@ -500,7 +500,7 @@ EOF'
 
       - name: Test PySpark job execution
         run: |
-          podman exec rsm-test bash -l -c "python -c 'from pyspark.sql import SparkSession; spark = SparkSession.builder.master(\"local\").getOrCreate(); print(\"PySpark works\"); spark.stop()'"
+          podman exec rsm-test bash -l -c "/opt/base-uv/.venv/bin/python -c 'from pyspark.sql import SparkSession; spark = SparkSession.builder.master(\"local\").getOrCreate(); print(\"PySpark works\"); spark.stop()'"
 
       - name: Cleanup
         if: always()
