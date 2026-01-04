@@ -227,6 +227,11 @@ RUN mkdir -p /var/log/postgresql /var/log/sshd && \
     chown jovyan:users /var/log/postgresql && \
     chmod 750 /var/log/postgresql
 
+# Ensure Postgres socket/lock directory is writable by non-root user
+RUN mkdir -p /var/run/postgresql && \
+    chown jovyan:users /var/run/postgresql && \
+    chmod 775 /var/run/postgresql
+
 # Oh-my-zsh and other zsh setup
 COPY files/install-ohmyzsh.sh setup.sh
 RUN chmod +x setup.sh && ./setup.sh && rm setup.sh

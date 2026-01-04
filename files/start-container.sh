@@ -10,6 +10,9 @@ echo "Starting PostgreSQL service..."
 # Initialize postgres if needed (e.g., fresh volume mount)
 /usr/local/bin/init-postgres-db.sh
 
+# Ensure runtime socket/lock directory is present for non-root user
+mkdir -p /var/run/postgresql
+
 # Start PostgreSQL
 /usr/lib/postgresql/${POSTGRES_VERSION}/bin/postgres \
     -c config_file=/etc/postgresql/${POSTGRES_VERSION}/main/postgresql.conf &
