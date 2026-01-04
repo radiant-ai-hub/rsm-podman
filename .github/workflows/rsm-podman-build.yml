@@ -1,6 +1,9 @@
 name: Build rsm-podman
 
 on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       version:
@@ -123,6 +126,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y podman
 
+      - name: Configure Podman storage to /mnt
+        run: |
+          sudo mkdir -p /mnt/podman/runroot
+          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+[storage]
+driver = "overlay"
+graphroot = "/mnt/podman"
+runroot = "/mnt/podman/runroot"
+EOF'
+
       - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
         run: |
@@ -208,6 +221,16 @@ jobs:
         run: |
           sudo apt-get install -y podman
 
+      - name: Configure Podman storage to /mnt
+        run: |
+          sudo mkdir -p /mnt/podman/runroot
+          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+[storage]
+driver = "overlay"
+graphroot = "/mnt/podman"
+runroot = "/mnt/podman/runroot"
+EOF'
+
       - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
         run: |
@@ -253,6 +276,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y podman
+
+      - name: Configure Podman storage to /mnt
+        run: |
+          sudo mkdir -p /mnt/podman/runroot
+          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+[storage]
+driver = "overlay"
+graphroot = "/mnt/podman"
+runroot = "/mnt/podman/runroot"
+EOF'
 
       - name: Log in to GHCR with Podman
         run: |
@@ -340,6 +373,16 @@ jobs:
         run: |
           sudo apt-get install -y podman
 
+      - name: Configure Podman storage to /mnt
+        run: |
+          sudo mkdir -p /mnt/podman/runroot
+          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+[storage]
+driver = "overlay"
+graphroot = "/mnt/podman"
+runroot = "/mnt/podman/runroot"
+EOF'
+
       - name: Log in to GHCR with Podman
         run: |
           echo "${{ secrets.GHCR_TOKEN }}" | podman login ${{ env.REGISTRY }} -u vnijs --password-stdin
@@ -422,7 +465,7 @@ jobs:
       - name: Test Python and PySpark imports
         run: |
           podman exec rsm-test bash -l -c '
-            /opt/conda/bin/python -c "import pyspark; print(f\"PySpark version: {pyspark.__version__}\")"
+            /opt/base-uv/.venv/bin/python -c "import pyspark; print(f\"PySpark version: {pyspark.__version__}\")"
           '
 
       - name: Test SSH accepts connections

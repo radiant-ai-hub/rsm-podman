@@ -47,6 +47,7 @@ CURRENT_PLATFORM := `uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'`
     echo "  just inspect               Inspect Docker manifest"
     echo "  just login                 Login to Docker Hub"
     echo "  just test-auth             Test Docker Hub authentication"
+    echo "  just local-integration-tests  Run local tests on latest Docker+Podman images"
     echo ""
     echo "📦 Podman Commands:"
     echo "  just podman-test           Build local test image"
@@ -91,6 +92,11 @@ CURRENT_PLATFORM := `uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'`
 
 @version:
     echo "Current VERSION: $(cat {{ VERSION_FILE }})"
+
+local-integration-tests:
+    #!/usr/bin/env bash
+    set -e
+    bash scripts/local-integration-tests.sh
 
 # =============================================================================
 # Version Management

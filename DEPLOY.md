@@ -10,8 +10,11 @@ This guide covers building and deploying multi-platform (AMD64 and ARM64) contai
 # Make sure to commit (but don't push) any local changes first
 git status
 
+# Run local integration tests against latest images
+just local-integration-tests
+
 # Bump version and trigger all builds automatically
-just bump 2.6.6
+just bump 2.6.9
 ```
 
 **Available Commands:**
@@ -423,3 +426,212 @@ The current version is always read from the `VERSION` file in the repository roo
 - `.github/workflows/test-podman-build.yml` - Test Podman build workflow
 - `scripts-docker-mp/` - Docker build scripts (legacy)
 - `scripts-podman-mp/` - Podman build scripts (legacy)
+
+
+## Testing Docker Image Locally
+
+IMAGE="vnijs/rsm-msba-k8s:latest"
+IMAGE="vnijs/rsm-msba-k8s:2.6.9"
+
+1) Clean slate
+
+```bash
+clear
+docker rm -f rsm-test || true
+```
+
+2) Run container and keep logs
+
+```bash
+docker run -d --name rsm-test -p 8765:8765 -p 2222:2222 $IMAGE /usr/local/bin/start-container.sh
+```
+
+3) Check status and exit code
+
+```bash
+docker ps -a --filter name=rsm-test
+```
+
+```bash
+docker inspect rsm-test --format 'State={{.State.Status}} ExitCode={{.State.ExitCode}}'
+```
+
+4) Dump full container logs
+
+```bash
+docker logs rsm-test
+```
+
+5) If it’s still running, inspect processes
+
+```bash
+docker exec rsm-test ps aux
+```
+
+```bash
+docker exec rsm-test bash -lc 'ls -l /var/log/postgresql && tail -n +1 /var/log/postgresql/postgresql-*.log'
+```
+
+6) Check healthcheck manually
+
+```bash
+docker exec rsm-test pg_isready -h localhost -p 8765 -U jovyan
+```
+
+## Extra
+
+1) Start a debug shell inside the image
+
+```bash
+docker run --rm -it --entrypoint bash $IMAGE
+```
+
+2) Check permissions that commonly break Postgres
+
+```bash
+id
+stat -c '%U:%G %a %n' /var/lib/postgresql/16/main /var/run/postgresql /var/log/postgresql
+ls -la /var/run/postgresql
+```
+
+3) Run the startup with tracing
+
+```bash
+bash -x /usr/local/bin/start-container.sh
+echo "exit=$?"
+cat /var/log/postgresql/postgresql-*.log
+```
+
+4) Immediately inspect Postgres logs
+
+```bash
+ls -la /var/log/postgresql
+tail -n +1 /var/log/postgresql/postgresql-*.log
+```
+
+5) If Postgres dies, check for socket/lock errors
+
+```bash
+grep -n "FATAL\|ERROR\|permission\|lock file\|could not create" /var/log/postgresql/postgresql-*.log
+```
+
+If you want to keep the container alive for inspection instead of it exiting, use:
+
+```bash
+/usr/local/bin/start-container.sh &
+sleep 3
+ps aux | egrep 'postgres|sshd'
+```
+
+docker exec rsm-test bash -l -c '/opt/base-uv/.venv/bin/python -c "import pyspark; print(f\"PySpark version: {pyspark.__version__}\")"'
+
+## Testing Podman Image Locally
+
+IMAGE="ghcr.io/radiant-ai-hub/rsm-podman:latest"
+
+
+1) Clean slate
+
+```bash
+clear
+podman rm -f rsm-test || true
+```
+
+2) Run container and keep logs
+
+```bash
+podman run -d --name rsm-test -p 8765:8765 -p 2222:2222 $IMAGE /usr/local/bin/start-container.sh
+```
+
+3) Check status and exit code
+
+```bash
+podman ps -a --filter name=rsm-test
+```
+
+```bash
+podman inspect rsm-test --format 'State={{.State.Status}} ExitCode={{.State.ExitCode}}'
+```
+
+4) Dump full container logs
+
+```bash
+podman logs rsm-test
+```
+
+5) If it’s still running, inspect processes
+
+```bash
+podman exec rsm-test ps aux;
+```
+
+```bash
+podman exec rsm-test bash -lc 'ls -l /var/log/postgresql && tail -n +1 /var/log/postgresql/postgresql-*.log'
+```
+
+6) Check healthcheck manually
+
+```bash
+podman exec rsm-test pg_isready -h localhost -p 8765 -U jovyan
+```
+
+## Extra
+
+1) Start a debug shell inside the image
+
+```bash
+podman run --rm -it --entrypoint bash $IMAGE
+```
+
+2) Check permissions that commonly break Postgres
+
+```bash
+id
+stat -c '%U:%G %a %n' /var/lib/postgresql/16/main /var/run/postgresql /var/log/postgresql
+ls -la /var/run/postgresql
+```
+
+3) Run the startup with tracing
+
+```bash
+bash -x /usr/local/bin/start-container.sh
+echo "exit=$?"
+cat /var/log/postgresql/postgresql-*.log
+```
+
+4) Immediately inspect Postgres logs
+
+```bash
+ls -la /var/log/postgresql
+tail -n +1 /var/log/postgresql/postgresql-*.log
+```
+
+5) If Postgres dies, check for socket/lock errors
+
+```bash
+grep -n "FATAL\|ERROR\|permission\|lock file\|could not create" /var/log/postgresql/postgresql-*.log
+```
+
+If you want to keep the container alive for inspection instead of it exiting, use:
+
+```bash
+/usr/local/bin/start-container.sh &
+sleep 3
+ps aux | egrep 'postgres|sshd'
+`
+
+
+
+docker run --rm -it --entrypoint bash vnijs/rsm-msba-k8s:2.6.8
+
+Inside the container:
+
+mkdir -p /var/run/postgresql
+sudo chown jovyan:users /var/run/postgresql
+chmod 775 /var/run/postgresql
+bash -x /usr/local/bin/start-container.sh
+
+
+
+docker ps
+docker exec -it 6d3b684d6587 pg_isready -h localhost -p 8765 -U jovyan
