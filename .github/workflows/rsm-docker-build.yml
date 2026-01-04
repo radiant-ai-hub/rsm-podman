@@ -489,9 +489,18 @@ jobs:
           docker cp /tmp/test_key.pub rsm-test:/home/jovyan/.ssh/authorized_keys
           docker exec -u root rsm-test bash -c "chown jovyan:users /home/jovyan/.ssh/authorized_keys"
           docker exec -u root rsm-test bash -c "chmod 600 /home/jovyan/.ssh/authorized_keys"
-          # Test SSH connection
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"
+          # Test SSH connection (retry while sshd finishes initializing)
+          for i in {1..10}; do
+            if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o AddressFamily=inet -i /tmp/test_key -p 2222 jovyan@127.0.0.1 echo "SSH connection successful"; then
+              echo "SSH test passed"
+              exit 0
+            fi
+            echo "SSH connection attempt $i failed, retrying..."
+            sleep 3
+          done
+          echo "SSH connection failed after 10 attempts"
+          exit 1
 
       - name: Test Hadoop HDFS initialization
         run: |

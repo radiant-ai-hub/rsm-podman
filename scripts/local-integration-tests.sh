@@ -24,6 +24,21 @@ wait_for_postgres() {
   return 1
 }
 
+wait_for_ssh() {
+  local port="$1"
+  for i in {1..10}; do
+    if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o AddressFamily=inet -i /tmp/test_key -p "$port" jovyan@127.0.0.1 echo "SSH connection successful" >/dev/null 2>&1; then
+      echo "SSH is ready"
+      return 0
+    fi
+    echo "Waiting for SSH... (${i}/10)"
+    sleep 3
+  done
+  echo "SSH did not become ready"
+  return 1
+}
+
 run_tests() {
   local engine="$1"
   local container="$2"
@@ -59,8 +74,7 @@ run_tests() {
   "$engine" cp /tmp/test_key.pub "${container}:/home/jovyan/.ssh/authorized_keys"
   "$engine" exec $user_flag "$container" bash -c "chown jovyan:users /home/jovyan/.ssh/authorized_keys"
   "$engine" exec $user_flag "$container" bash -c "chmod 600 /home/jovyan/.ssh/authorized_keys"
-  ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -o AddressFamily=inet -i /tmp/test_key -p 2222 jovyan@127.0.0.1 echo "SSH connection successful"
+  wait_for_ssh 2222
 
   "$engine" exec "$container" bash -l -c '
     cd $HADOOP_HOME
