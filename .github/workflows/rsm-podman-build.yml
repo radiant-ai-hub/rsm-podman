@@ -479,7 +479,7 @@ jobs:
           podman exec --user root rsm-test bash -c "chmod 600 /home/jovyan/.ssh/authorized_keys"
           # Test SSH connection
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"
+            -o AddressFamily=inet -i /tmp/test_key -p 2222 jovyan@127.0.0.1 echo "SSH connection successful"
 
       - name: Test Hadoop HDFS initialization
         run: |

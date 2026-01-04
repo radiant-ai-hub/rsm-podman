@@ -60,7 +60,7 @@ run_tests() {
   "$engine" exec $user_flag "$container" bash -c "chown jovyan:users /home/jovyan/.ssh/authorized_keys"
   "$engine" exec $user_flag "$container" bash -c "chmod 600 /home/jovyan/.ssh/authorized_keys"
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"
+    -o AddressFamily=inet -i /tmp/test_key -p 2222 jovyan@127.0.0.1 echo "SSH connection successful"
 
   "$engine" exec "$container" bash -l -c '
     cd $HADOOP_HOME
