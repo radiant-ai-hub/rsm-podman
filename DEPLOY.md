@@ -13,8 +13,13 @@ git status
 # Run local integration tests against latest images
 just local-integration-tests
 
+# add a tag trigger
+git add .github/workflows/rsm-podman-build.yml justfile scripts/ensure-tag-triggers.py
+git commit -m "Fix podman workflow YAML and justfile guard"
+git push
+
 # Bump version and trigger all builds automatically
-just bump 2.6.11
+just bump 2.6.13
 ```
 
 **Available Commands:**
