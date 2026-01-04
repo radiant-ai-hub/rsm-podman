@@ -27,6 +27,10 @@ wait_for_postgres() {
 run_tests() {
   local engine="$1"
   local container="$2"
+  local user_flag="-u root"
+  if [[ "$engine" == "podman" ]]; then
+    user_flag="--user root"
+  fi
 
   "$engine" exec "$container" psql -h localhost -p 8765 -U jovyan -c 'SELECT 1 as test;'
   "$engine" exec "$container" psql -h localhost -p 8765 -U jovyan -c '
@@ -53,7 +57,8 @@ run_tests() {
   ssh-keygen -t ed25519 -f /tmp/test_key -N "" >/dev/null
   "$engine" exec "$container" bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
   "$engine" cp /tmp/test_key.pub "${container}:/home/jovyan/.ssh/authorized_keys"
-  "$engine" exec "$container" bash -c "chmod 600 ~/.ssh/authorized_keys"
+  "$engine" exec $user_flag "$container" bash -c "chown jovyan:users /home/jovyan/.ssh/authorized_keys"
+  "$engine" exec $user_flag "$container" bash -c "chmod 600 /home/jovyan/.ssh/authorized_keys"
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"
 

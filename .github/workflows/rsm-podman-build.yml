@@ -475,7 +475,8 @@ EOF'
           # Add public key to container
           podman exec rsm-test bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
           podman cp /tmp/test_key.pub rsm-test:/home/jovyan/.ssh/authorized_keys
-          podman exec rsm-test bash -c "chmod 600 ~/.ssh/authorized_keys"
+          podman exec --user root rsm-test bash -c "chown jovyan:users /home/jovyan/.ssh/authorized_keys"
+          podman exec --user root rsm-test bash -c "chmod 600 /home/jovyan/.ssh/authorized_keys"
           # Test SSH connection
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"

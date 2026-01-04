@@ -487,7 +487,8 @@ jobs:
           # Add public key to container
           docker exec rsm-test bash -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
           docker cp /tmp/test_key.pub rsm-test:/home/jovyan/.ssh/authorized_keys
-          docker exec rsm-test bash -c "chmod 600 ~/.ssh/authorized_keys"
+          docker exec -u root rsm-test bash -c "chown jovyan:users /home/jovyan/.ssh/authorized_keys"
+          docker exec -u root rsm-test bash -c "chmod 600 /home/jovyan/.ssh/authorized_keys"
           # Test SSH connection
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
             -i /tmp/test_key -p 2222 jovyan@localhost echo "SSH connection successful"

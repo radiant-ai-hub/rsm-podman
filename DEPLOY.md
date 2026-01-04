@@ -14,7 +14,7 @@ git status
 just local-integration-tests
 
 # Bump version and trigger all builds automatically
-just bump 2.6.9
+just bump 2.6.11
 ```
 
 **Available Commands:**
