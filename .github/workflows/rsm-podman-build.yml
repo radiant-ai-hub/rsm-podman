@@ -129,12 +129,12 @@ jobs:
       - name: Configure Podman storage to /mnt
         run: |
           sudo mkdir -p /mnt/podman/runroot
-          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+          sudo tee /etc/containers/storage.conf >/dev/null <<'EOF'
 [storage]
 driver = "overlay"
 graphroot = "/mnt/podman"
 runroot = "/mnt/podman/runroot"
-EOF'
+EOF
 
       - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
@@ -224,12 +224,12 @@ EOF'
       - name: Configure Podman storage to /mnt
         run: |
           sudo mkdir -p /mnt/podman/runroot
-          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+          sudo tee /etc/containers/storage.conf >/dev/null <<'EOF'
 [storage]
 driver = "overlay"
 graphroot = "/mnt/podman"
 runroot = "/mnt/podman/runroot"
-EOF'
+EOF
 
       - name: Log in to GHCR with Podman
         if: github.event_name != 'pull_request'
@@ -280,12 +280,12 @@ EOF'
       - name: Configure Podman storage to /mnt
         run: |
           sudo mkdir -p /mnt/podman/runroot
-          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+          sudo tee /etc/containers/storage.conf >/dev/null <<'EOF'
 [storage]
 driver = "overlay"
 graphroot = "/mnt/podman"
 runroot = "/mnt/podman/runroot"
-EOF'
+EOF
 
       - name: Log in to GHCR with Podman
         run: |
@@ -376,12 +376,12 @@ EOF'
       - name: Configure Podman storage to /mnt
         run: |
           sudo mkdir -p /mnt/podman/runroot
-          sudo sh -c 'cat >/etc/containers/storage.conf <<EOF
+          sudo tee /etc/containers/storage.conf >/dev/null <<'EOF'
 [storage]
 driver = "overlay"
 graphroot = "/mnt/podman"
 runroot = "/mnt/podman/runroot"
-EOF'
+EOF
 
       - name: Log in to GHCR with Podman
         run: |
