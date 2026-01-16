@@ -19,7 +19,7 @@ git commit -m "Fix podman workflow YAML and justfile guard"
 git push
 
 # Bump version and trigger all builds automatically
-just bump 2.6.13
+just bump 2.8.0
 ```
 
 **Available Commands:**

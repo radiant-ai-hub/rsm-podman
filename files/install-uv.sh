@@ -17,6 +17,7 @@ cd /opt/base-uv
 uv init --python ">=${python_version},<3.14"
 uv venv
 source .venv/bin/activate
+uv add pyrsm==2.2.0 --default-index https://pypi.org/simple/
 
 uv add \
   torch \
@@ -30,7 +31,6 @@ uv add pyarrow \
 
 # Install core data science packages first
 uv add \
-  pyrsm \
   scipy \
   sqlalchemy \
   psycopg2 \
