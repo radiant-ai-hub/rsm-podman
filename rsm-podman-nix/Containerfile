@@ -1,0 +1,110 @@
+FROM nixos/nix:2.31.3@sha256:d49538facc7757890eccfa5f57869ad18c823c24903e3b8ac6ca8a301d84a9b6
+
+SHELL ["/bin/sh", "-c"]
+
+ARG IMAGE_VERSION=dev
+
+ENV IMAGE_VERSION="${IMAGE_VERSION}" \
+    QUARTO_VERSION=1.9.13 \
+    RSM_UID=1000 \
+    RSM_GID=1000 \
+    SHELL=/bin/zsh \
+    ZDOTDIR=/etc/rsm/zsh \
+    PATH=/opt/base-uv/.venv/bin:/opt/rsm-nix-profile/bin:/usr/local/bin:/usr/bin:/bin:/nix/var/nix/profiles/default/bin \
+    UV_LINK_MODE=copy \
+    PIP_REQUIRE_VIRTUALENV=true \
+    QUARTO_PYTHON=/opt/base-uv/.venv/bin/python \
+    RETICULATE_PYTHON=/opt/base-uv/.venv/bin/python \
+    PYSPARK_PYTHON=/opt/base-uv/.venv/bin/python \
+    PYSPARK_DRIVER_PYTHON=/opt/base-uv/.venv/bin/python
+
+WORKDIR /tmp/rsm-podman-nix
+
+COPY rsm-podman-nix/flake.nix rsm-podman-nix/flake.lock ./
+
+RUN nix --extra-experimental-features "nix-command flakes" \
+      build .#runtimeEnv --out-link /opt/rsm-nix-profile && \
+    nix --extra-experimental-features "nix-command flakes" \
+      build .#glibc-compat --out-link /opt/rsm-glibc-compat && \
+    nix-collect-garbage -d
+
+ENV SSL_CERT_FILE=/opt/rsm-nix-profile/etc/ssl/certs/ca-bundle.crt \
+    NIX_SSL_CERT_FILE=/opt/rsm-nix-profile/etc/ssl/certs/ca-bundle.crt \
+    LD_LIBRARY_PATH=/opt/rsm-nix-profile/lib \
+    LOCALE_ARCHIVE=/opt/rsm-nix-profile/lib/locale/locale-archive \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
+
+RUN mkdir -p /bin /lib /lib64 /sbin /usr/bin /usr/lib /usr/local/bin /usr/sbin /etc/profile.d /etc/rsm/zsh /etc/skel /opt/base-uv && \
+    ln -sf /opt/rsm-nix-profile/bin/env /usr/bin/env && \
+    ln -sf /opt/rsm-nix-profile/bin/ldd /usr/bin/ldd && \
+    ln -sf /opt/rsm-nix-profile/bin/strings /usr/bin/strings && \
+    ln -sf /opt/rsm-nix-profile/bin/tar /usr/bin/tar && \
+    ln -sf /opt/rsm-glibc-compat/lib/libc.so.6 /lib/libc.so.6 && \
+    ln -sf /opt/rsm-glibc-compat/lib/libc.so.6 /usr/lib/libc.so.6 && \
+    ln -sf /opt/rsm-nix-profile/lib/libstdc++.so.6 /lib/libstdc++.so.6 && \
+    ln -sf /opt/rsm-nix-profile/lib/libstdc++.so.6 /usr/lib/libstdc++.so.6 && \
+    if [ -e /opt/rsm-glibc-compat/lib/libc.so ]; then \
+      ln -sf /opt/rsm-glibc-compat/lib/libc.so /lib/libc.so; \
+      ln -sf /opt/rsm-glibc-compat/lib/libc.so /usr/lib/libc.so; \
+    fi && \
+    for loader in /opt/rsm-glibc-compat/lib/ld-linux*.so*; do \
+      [ -e "$loader" ] || continue; \
+      loader_name="$(basename "$loader")"; \
+      ln -sf "$loader" "/lib/$loader_name"; \
+      if [ "$loader_name" = "ld-linux-x86-64.so.2" ]; then \
+        ln -sf "$loader" "/lib64/$loader_name"; \
+      fi; \
+    done && \
+    printf '%s\n' \
+      '#!/bin/sh' \
+      'if [ "${1:-}" = "-p" ]; then' \
+      '  echo "    libc.so.6 (libc6) => /lib/libc.so.6"' \
+      '  echo "    libstdc++.so.6 (libc6) => /lib/libstdc++.so.6"' \
+      '  exit 0' \
+      'fi' \
+      'exit 0' > /usr/sbin/ldconfig && \
+    chmod 755 /usr/sbin/ldconfig && \
+    ln -sf /usr/sbin/ldconfig /sbin/ldconfig && \
+    ln -sf /usr/sbin/ldconfig /usr/bin/ldconfig && \
+    ln -sf /opt/rsm-nix-profile/bin/pgweb /usr/local/bin/pgweb_binary && \
+    ln -sf /opt/rsm-nix-profile/bin/sshd /usr/sbin/sshd
+
+RUN ln -sf /opt/rsm-nix-profile/bin/bash /bin/bash && \
+    ln -sf /opt/rsm-nix-profile/bin/zsh /bin/zsh && \
+    ln -sf /opt/rsm-nix-profile/bin/bash /bin/sh
+
+RUN for name in passwd group shadow; do \
+      if [ -L "/etc/$name" ]; then \
+        cp -L "/etc/$name" "/tmp/$name" && \
+        rm "/etc/$name" && \
+        mv "/tmp/$name" "/etc/$name"; \
+      fi; \
+    done && \
+    chmod 644 /etc/passwd /etc/group && \
+    chmod 600 /etc/shadow
+
+COPY rsm-podman-nix/pyproject.toml rsm-podman-nix/uv.lock /opt/base-uv/
+
+WORKDIR /opt/base-uv
+
+RUN uv venv --python /opt/rsm-nix-profile/bin/python3 /opt/base-uv/.venv && \
+    uv sync --frozen --no-dev --python /opt/base-uv/.venv/bin/python && \
+    /opt/base-uv/.venv/bin/python -m ipykernel install \
+      --prefix=/opt/base-uv/.venv \
+      --name=rsm-base-uv \
+      --display-name="RSM base uv"
+
+COPY rsm-podman-nix/files/bin/rsm-entrypoint /usr/local/bin/rsm-entrypoint
+COPY rsm-podman-nix/files/bin/setup /usr/local/bin/setup
+COPY rsm-podman-nix/files/profile.d/rsm-env.sh /etc/profile.d/rsm-env.sh
+COPY rsm-podman-nix/files/zsh/zshenv /etc/zshenv
+COPY rsm-podman-nix/files/zsh/zshrc /etc/rsm/zsh/.zshrc
+
+RUN chmod 755 /usr/local/bin/rsm-entrypoint /usr/local/bin/setup && \
+    chmod 644 /etc/profile.d/rsm-env.sh /etc/zshenv /etc/rsm/zsh/.zshrc && \
+    mkdir -p /home /var/log/rsm && \
+    chmod 755 /home
+
+ENTRYPOINT ["/usr/local/bin/rsm-entrypoint"]
+CMD ["/bin/zsh", "-l"]

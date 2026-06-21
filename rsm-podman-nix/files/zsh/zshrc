@@ -1,0 +1,102 @@
+export PATH="/opt/base-uv/.venv/bin:/opt/rsm-nix-profile/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+if [[ -r /etc/profile.d/rsm-env.sh ]]; then
+  source /etc/profile.d/rsm-env.sh
+fi
+
+if [[ -z "${RSMBASE:-}" || "$RSMBASE" != "$HOME"/* ]]; then
+  export RSMBASE="$HOME/.rsm-msba"
+fi
+: "${RSM_ZSH_USER_CONFIG:=$RSMBASE/zsh}"
+: "${RSM_ZSH_STATE:=$RSMBASE/zsh}"
+: "${RSM_ZSH_CACHE:=$RSMBASE/zsh/.cache}"
+
+mkdir -p "$RSM_ZSH_USER_CONFIG" "$RSM_ZSH_STATE" "$RSM_ZSH_CACHE" 2>/dev/null || true
+
+export LANG="${LANG:-en_US.UTF-8}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$RSMBASE/uv-cache}"
+export PIP_REQUIRE_VIRTUALENV="${PIP_REQUIRE_VIRTUALENV:-true}"
+export QUARTO_PYTHON="${QUARTO_PYTHON:-/opt/base-uv/.venv/bin/python}"
+export RETICULATE_PYTHON="${RETICULATE_PYTHON:-/opt/base-uv/.venv/bin/python}"
+export PYSPARK_PYTHON="${PYSPARK_PYTHON:-/opt/base-uv/.venv/bin/python}"
+export PYSPARK_DRIVER_PYTHON="${PYSPARK_DRIVER_PYTHON:-/opt/base-uv/.venv/bin/python}"
+
+HISTFILE="$RSM_ZSH_STATE/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt append_history
+setopt extended_history
+setopt hist_expire_dups_first
+setopt hist_ignore_dups
+setopt hist_ignore_space
+setopt hist_reduce_blanks
+setopt inc_append_history
+setopt share_history
+
+touch "$HISTFILE" 2>/dev/null || true
+chmod 600 "$HISTFILE" 2>/dev/null || true
+
+ZSH_DISABLE_COMPFIX=true
+ZSH="/opt/rsm-nix-profile/share/oh-my-zsh"
+ZSH_THEME=""
+ZSH_COMPDUMP="$RSM_ZSH_CACHE/.zcompdump"
+ZSH_CACHE_DIR="$RSM_ZSH_CACHE"
+
+fpath=(
+  /opt/rsm-nix-profile/share/zsh/site-functions
+  $fpath
+)
+
+plugins=(git)
+
+if [[ -r "$ZSH/oh-my-zsh.sh" ]]; then
+  source "$ZSH/oh-my-zsh.sh"
+fi
+
+if [[ -r /opt/rsm-nix-profile/share/autojump/autojump.zsh ]]; then
+  source /opt/rsm-nix-profile/share/autojump/autojump.zsh
+fi
+
+if [[ -r /opt/rsm-nix-profile/share/zsh/themes/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+  source /opt/rsm-nix-profile/share/zsh/themes/powerlevel10k/powerlevel10k.zsh-theme
+  if [[ -r "$RSM_ZSH_USER_CONFIG/.p10k.zsh" ]]; then
+    source "$RSM_ZSH_USER_CONFIG/.p10k.zsh"
+  elif [[ -r /opt/rsm-nix-profile/share/zsh/themes/powerlevel10k/config/p10k-lean.zsh ]]; then
+    source /opt/rsm-nix-profile/share/zsh/themes/powerlevel10k/config/p10k-lean.zsh
+  fi
+fi
+
+alias c="clear"
+alias pgweb="/usr/local/bin/pgweb_binary --bind=0.0.0.0 --listen=8282 --port=8765"
+alias sbase="source /opt/base-uv/.venv/bin/activate"
+alias sp="source .venv/bin/activate"
+alias zc='${EDITOR:-vim} "$RSM_ZSH_USER_CONFIG/local.zsh"'
+alias zp='${EDITOR:-vim} "$RSM_ZSH_USER_CONFIG/.p10k.zsh"'
+
+if command -v uv >/dev/null 2>&1; then
+  eval "$(uv generate-shell-completion zsh)"
+  eval "$(uvx --generate-shell-completion zsh)"
+fi
+
+if [[ -r /opt/rsm-nix-profile/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+  ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+  source /opt/rsm-nix-profile/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+fi
+
+if [[ -r /opt/rsm-nix-profile/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh ]]; then
+  source /opt/rsm-nix-profile/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
+fi
+
+if [[ -r "$RSM_ZSH_USER_CONFIG/local.zsh" ]]; then
+  source "$RSM_ZSH_USER_CONFIG/local.zsh"
+fi
+
+if [[ -r /opt/rsm-nix-profile/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+  source /opt/rsm-nix-profile/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
+
+{ source /opt/base-uv/.venv/bin/activate; } 2>/dev/null

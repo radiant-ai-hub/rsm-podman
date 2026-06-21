@@ -19,11 +19,11 @@ uv venv
 source .venv/bin/activate
 uv add pyrsm==2.2.0 --default-index https://pypi.org/simple/
 
-uv add \
-  torch \
-  torchvision \
-  torchaudio \
-  --default-index https://pypi.org/simple/
+# uv add \
+#   torch \
+#   torchvision \
+#   torchaudio \
+#   --default-index https://pypi.org/simple/
   # --default-index https://download.pytorch.org/whl/cpu
 
 uv add pyarrow \

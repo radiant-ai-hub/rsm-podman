@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+rsm_base="${RSMBASE:-$HOME/.rsm-msba}"
+zsh_config="$rsm_base/zsh"
+zsh_state="$rsm_base/zsh"
+zsh_cache="$rsm_base/zsh/.cache"
+
+mkdir -p "$zsh_config" "$zsh_state" "$zsh_cache" "$rsm_base/uv-cache"
+
+if [ ! -f "$zsh_config/local.zsh" ]; then
+  cat > "$zsh_config/local.zsh" <<'EOF'
+# Local RSM zsh customizations.
+# This file is persisted in your mounted home and sourced by the image-owned zshrc.
+
+# Examples:
+# alias ll='ls -alF'
+# export EDITOR=vim
+EOF
+fi
+
+if [ ! -f "$zsh_config/.p10k.zsh" ]; then
+  cat > "$zsh_config/.p10k.zsh" <<'EOF'
+# Powerlevel10k configuration persisted in your mounted home.
+# Edit this file or replace it with output from `p10k configure`.
+source /opt/rsm-nix-profile/share/zsh/themes/powerlevel10k/config/p10k-lean.zsh
+EOF
+fi
+
+touch "$zsh_state/.zsh_history"
+chmod 600 "$zsh_state/.zsh_history"
+
+echo "RSM shell setup complete."
+echo "  base       : $rsm_base"
+echo "  zsh config : $zsh_config"
+echo "  zsh history: $zsh_state/.zsh_history"
+echo "  image zshrc: /etc/rsm/zsh/.zshrc"

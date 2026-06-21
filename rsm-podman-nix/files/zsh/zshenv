@@ -1,0 +1,11 @@
+if [ -n "${HOME:-}" ]; then
+  case "${RSMBASE:-}" in
+    "$HOME"/*) ;;
+    *) export RSMBASE="$HOME/.rsm-msba" ;;
+  esac
+  export RSM_ZSH_USER_CONFIG="${RSM_ZSH_USER_CONFIG:-$RSMBASE/zsh}"
+  export RSM_ZSH_STATE="${RSM_ZSH_STATE:-$RSMBASE/zsh}"
+  export RSM_ZSH_CACHE="${RSM_ZSH_CACHE:-$RSMBASE/zsh/.cache}"
+fi
+
+export ZDOTDIR="${ZDOTDIR:-/etc/rsm/zsh}"

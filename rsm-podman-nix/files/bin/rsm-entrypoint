@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+resolve_username() {
+  local raw="${RSM_USERNAME:-}"
+
+  if [ -z "$raw" ] && [ -n "${RSM_USER_EMAIL:-}" ]; then
+    raw="${RSM_USER_EMAIL%@*}"
+  fi
+
+  if [ -z "$raw" ] && [ -n "${NB_USER:-}" ] && [ "${NB_USER}" != "jovyan" ]; then
+    raw="${NB_USER}"
+  fi
+
+  if [ -z "$raw" ]; then
+    raw="rsmuser"
+  fi
+
+  printf '%s' "$raw" | tr '[:upper:]' '[:lower:]'
+}
+
+ensure_group() {
+  local username="$1"
+  local gid="$2"
+  local group_name
+
+  group_name="$(awk -F: -v gid="$gid" '$3 == gid { print $1; exit }' /etc/group)"
+  if [ -n "$group_name" ]; then
+    printf '%s' "$group_name"
+    return
+  fi
+
+  group_name="$(awk -F: -v name="$username" '$1 == name { print $1; exit }' /etc/group)"
+  if [ -n "$group_name" ]; then
+    printf '%s' "$group_name"
+    return
+  fi
+
+  group_name="$username"
+  printf '%s:x:%s:\n' "$group_name" "$gid" >> /etc/group
+  printf '%s' "$group_name"
+}
+
+ensure_user() {
+  local username="$1"
+  local uid="$2"
+  local gid="$3"
+  local home="$4"
+  local shell="/bin/zsh"
+  local existing_user
+
+  if awk -F: -v name="$username" '$1 == name { found=1 } END { exit !found }' /etc/passwd; then
+    return
+  fi
+
+  existing_user="$(awk -F: -v uid="$uid" '$3 == uid { print $1; exit }' /etc/passwd)"
+  if [ -n "$existing_user" ] && [ "$existing_user" != "$username" ]; then
+    echo "UID $uid already belongs to user '$existing_user'; cannot create '$username'." >&2
+    exit 1
+  fi
+
+  printf '%s:x:%s:%s:RSM User:%s:%s\n' "$username" "$uid" "$gid" "$home" "$shell" >> /etc/passwd
+
+  if [ -f /etc/shadow ]; then
+    printf '%s:!:19770:0:99999:7:::\n' "$username" >> /etc/shadow
+  fi
+}
+
+prepare_nix_permissions() {
+  local uid="$1"
+  local gid="$2"
+
+  if [ ! -d /nix/var/nix ]; then
+    return
+  fi
+
+  chgrp "$gid" /nix /nix/store /nix/var 2>/dev/null || true
+  chmod g+rx /nix /nix/var 2>/dev/null || true
+  chown "$uid:$gid" /nix/store 2>/dev/null || true
+  chmod 1775 /nix/store 2>/dev/null || true
+
+  if [ -d /nix/var/log/nix ]; then
+    chown -R "$uid:$gid" /nix/var/log/nix 2>/dev/null || true
+    find /nix/var/log/nix -xdev -type d -exec chmod u+rwx,g+rwx {} + 2>/dev/null || true
+    find /nix/var/log/nix -xdev -type f -exec chmod u+rw,g+rw {} + 2>/dev/null || true
+  fi
+
+  chown -R "$uid:$gid" /nix/var/nix 2>/dev/null || true
+  find /nix/var/nix -xdev -type d -exec chmod u+rwx,g+rwx {} + 2>/dev/null || true
+  find /nix/var/nix -xdev -type f -exec chmod u+rw,g+rw {} + 2>/dev/null || true
+}
+
+main() {
+  local username uid gid group_name home
+
+  username="$(resolve_username)"
+
+  if ! [[ "$username" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    echo "Invalid RSM username '$username'. Use a lowercase POSIX username, e.g. xyz123." >&2
+    exit 1
+  fi
+
+  uid="${RSM_UID:-1000}"
+  gid="${RSM_GID:-1000}"
+
+  if ! [[ "$uid" =~ ^[0-9]+$ ]] || ! [[ "$gid" =~ ^[0-9]+$ ]]; then
+    echo "RSM_UID and RSM_GID must be numeric." >&2
+    exit 1
+  fi
+
+  home="/home/$username"
+  group_name="$(ensure_group "$username" "$gid")"
+  gid="$(awk -F: -v name="$group_name" '$1 == name { print $3; exit }' /etc/group)"
+
+  ensure_user "$username" "$uid" "$gid" "$home"
+  prepare_nix_permissions "$uid" "$gid"
+  mkdir -p "$home"
+
+  if [ -z "$(find "$home" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+    chown "$uid:$gid" "$home"
+  fi
+
+  export HOME="$home"
+  export USER="$username"
+  export LOGNAME="$username"
+  export RSM_USERNAME="$username"
+  export NB_USER="$username"
+  export RSMBASE="$home/.rsm-msba"
+  export RSM_ZSH_USER_CONFIG="$RSMBASE/zsh"
+  export RSM_ZSH_STATE="$RSMBASE/zsh"
+  export RSM_ZSH_CACHE="$RSMBASE/zsh/.cache"
+  export UV_CACHE_DIR="$RSMBASE/uv-cache"
+  export ZDOTDIR="/etc/rsm/zsh"
+
+  if [ "$#" -eq 0 ]; then
+    set -- /bin/zsh -l
+  fi
+
+  if [ "${RSM_ENTRYPOINT_AS_ROOT:-0}" = "1" ]; then
+    exec "$@"
+  fi
+
+  exec gosu "$username" env \
+    HOME="$HOME" \
+    USER="$USER" \
+    LOGNAME="$LOGNAME" \
+    RSM_USERNAME="$RSM_USERNAME" \
+    NB_USER="$NB_USER" \
+    RSMBASE="$RSMBASE" \
+    RSM_ZSH_USER_CONFIG="$RSM_ZSH_USER_CONFIG" \
+    RSM_ZSH_STATE="$RSM_ZSH_STATE" \
+    RSM_ZSH_CACHE="$RSM_ZSH_CACHE" \
+    UV_CACHE_DIR="$UV_CACHE_DIR" \
+    ZDOTDIR="$ZDOTDIR" \
+    "$@"
+}
+
+main "$@"
