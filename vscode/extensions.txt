@@ -10,7 +10,6 @@ GitHub.copilot
 GitHub.copilot-chat
 mechatroner.rainbow-csv
 medo64.render-crlf
-ms-azuretools.vscode-docker
 ms-python.python
 ms-toolsai.jupyter
 ms-toolsai.jupyter-keymap
@@ -30,4 +29,6 @@ tomoki1207.pdf
 cweijan.vscode-office
 nefrob.vscode-just-syntax
 davidanson.vscode-markdownlint
+pinage404.nix-extension-pack
 vnijs.rsm-vscode
+cweijan.vscode-office
